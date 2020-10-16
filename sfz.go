@@ -2,7 +2,8 @@ package main
 
 import (
 	"io/ioutil"
-	"path/filepath"
+	"path"
+	"strings"
 )
 
 type SfzValuePair struct {
@@ -42,7 +43,7 @@ func createStackFrame(filename string) (*sfzParseStackFrame, error) {
 	return &sfzParseStackFrame{
 		[]rune(string(content)),
 		0,
-		filepath.Dir(filename),
+		path.Dir(filename),
 	}, nil
 }
 
@@ -139,14 +140,15 @@ func checkFinishPair(target *SfzFile, context *sfzParseContext, frame *sfzParseS
 	if context.currentLabel != "" {
 		var section = getLastSection(target)
 
-		if context.currentValue == "sample" {
+		if context.currentLabel == "sample" {
+			var cleanedPath = path.Clean(strings.Replace(context.currentValue, "\\", "/", -1))
 			if context.defaultPath == "" {
-				context.currentValue = filepath.Join(frame.cwd, context.currentValue)
+				context.currentValue = path.Join(frame.cwd, cleanedPath)
 			} else {
-				context.currentValue = filepath.Join(context.defaultPath, context.currentValue)
+				context.currentValue = path.Join(context.defaultPath, cleanedPath)
 			}
-		} else if context.currentValue == "default_path" {
-			context.defaultPath = filepath.Join(frame.cwd, context.currentValue)
+		} else if context.currentLabel == "default_path" {
+			context.defaultPath = path.Join(frame.cwd, path.Clean(strings.Replace(context.currentValue, "\\", "/", -1)))
 		}
 
 		section.ValuePairs = append(section.ValuePairs, SfzValuePair{
@@ -165,20 +167,22 @@ func parseInto(target *SfzFile, context *sfzParseContext, frame *sfzParseStackFr
 	for hasNext {
 		current, prevSep, nextChar := nextToken(context, frame)
 
-		if current == "#define" {
+		if current == "" {
+			hasNext = false
+		} else if current == "#define" {
 			name, _, _ := nextToken(context, frame)
 			value, _, _ := nextToken(context, frame)
 
 			context.definitions[name] = value
 		} else if current == "#include" {
-			path, _, _ := nextToken(context, frame)
+			includePath, _, _ := nextToken(context, frame)
 
-			for path[len(path)-1] != '"' {
+			for includePath[len(includePath)-1] != '"' {
 				pathSegment, whitespace, _ := nextToken(context, frame)
-				path = path + whitespace + pathSegment
+				includePath = includePath + whitespace + pathSegment
 			}
 
-			var absolutePath = filepath.Join(frame.cwd, path)
+			var absolutePath = path.Join(frame.cwd, includePath)
 
 			nextStackFrame, err := createStackFrame(absolutePath)
 
