@@ -51,7 +51,7 @@ func (book *ALADPCMBook) serializeWrite(state *alSerializeState, target io.Write
 }
 
 func (book *ALADPCMBook) sizeInBytes() int {
-
+	return 8
 }
 
 func (book *ALADPCMBook) generateLayout(state *alSerializeState) {
