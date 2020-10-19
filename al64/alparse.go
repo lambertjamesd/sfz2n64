@@ -4,17 +4,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"os"
-	"sort"
 )
 
-type alDeferredBookRead struct {
-	book *ALADPCMBook
-	addr int32
-}
-
 type alParseState struct {
-	parsed           map[int32]interface{}
-	pendingBookReads []alDeferredBookRead
+	parsed map[int32]interface{}
 }
 
 type alTypeParser func(*alParseState, SeekableReader, int32) (interface{}, error)
@@ -81,10 +74,13 @@ func readBook(state *alParseState, reader SeekableReader, address int32) (interf
 	binary.Read(reader, binary.BigEndian, &result.Order)
 	binary.Read(reader, binary.BigEndian, &result.NPredictors)
 
-	state.pendingBookReads = append(state.pendingBookReads, alDeferredBookRead{
-		&result,
-		address,
-	})
+	var bookCount = result.Order * result.NPredictors * 8
+
+	result.Book = make([]int16, bookCount)
+
+	for i := 0; int32(i) < bookCount; i = i + 1 {
+		binary.Read(reader, binary.BigEndian, &result.Book[i])
+	}
 
 	return &result, nil
 }
@@ -297,6 +293,8 @@ func readInstrument(state *alParseState, reader SeekableReader, address int32) (
 	var soundCount int16
 	binary.Read(reader, binary.BigEndian, &soundCount)
 
+	result.SoundArray = make([]*ALSound, soundCount)
+
 	for i := 0; int16(i) < soundCount; i = i + 1 {
 		var soundOffset int32
 		binary.Read(reader, binary.BigEndian, &soundOffset)
@@ -317,7 +315,7 @@ func readInstrument(state *alParseState, reader SeekableReader, address int32) (
 			return nil, errors.New("Expected ALSound")
 		}
 
-		result.SoundArray = append(result.SoundArray, sound)
+		result.SoundArray[i] = sound
 	}
 
 	return &result, nil
@@ -353,6 +351,8 @@ func readBank(state *alParseState, reader SeekableReader, address int32) (interf
 		result.Percussion = nil
 	}
 
+	result.InstArray = make([]*ALInstrument, instrumentCount)
+
 	for i := 0; int16(i) < instrumentCount; i = i + 1 {
 		var instrumentOffset int32
 		binary.Read(reader, binary.BigEndian, &instrumentOffset)
@@ -373,7 +373,7 @@ func readBank(state *alParseState, reader SeekableReader, address int32) (interf
 			return nil, errors.New("Expected ALInstrument")
 		}
 
-		result.InstArray = append(result.InstArray, inst)
+		result.InstArray[i] = inst
 	}
 
 	return &result, nil
@@ -395,6 +395,8 @@ func readBankFile(state *alParseState, reader SeekableReader, address int32) (in
 	var bankCount int16
 	binary.Read(reader, binary.BigEndian, &bankCount)
 
+	result.BankArray = make([]*ALBank, bankCount)
+
 	for i := 0; int16(i) < bankCount; i = i + 1 {
 		var addr int32
 		binary.Read(reader, binary.BigEndian, &addr)
@@ -415,83 +417,10 @@ func readBankFile(state *alParseState, reader SeekableReader, address int32) (in
 			return nil, errors.New("Expected ALBank")
 		}
 
-		result.BankArray = append(result.BankArray, bank)
+		result.BankArray[i] = bank
 	}
 
 	return &result, nil
-}
-
-type chunkLocations []int32
-
-func (arr chunkLocations) Len() int {
-	return len(arr)
-}
-
-func (arr chunkLocations) Less(i, j int) bool {
-	return arr[i] < arr[j]
-}
-
-func (arr chunkLocations) Swap(i, j int) {
-	arr[i], arr[j] = arr[j], arr[i]
-}
-
-type alDeferredBookReadArray []alDeferredBookRead
-
-func (arr alDeferredBookReadArray) Len() int {
-	return len(arr)
-}
-
-func (arr alDeferredBookReadArray) Less(i, j int) bool {
-	return arr[i].addr < arr[j].addr
-}
-
-func (arr alDeferredBookReadArray) Swap(i, j int) {
-	arr[i], arr[j] = arr[j], arr[i]
-}
-
-func finishPendingBookReads(state *alParseState, source SeekableReader) error {
-	var chunkLocations chunkLocations = nil
-
-	for addr, _ := range state.parsed {
-		chunkLocations = append(chunkLocations, addr)
-	}
-
-	end, _ := source.Seek(0, os.SEEK_END)
-
-	chunkLocations = append(chunkLocations, int32(end))
-
-	sort.Sort(chunkLocations)
-
-	var pendingBookReads alDeferredBookReadArray = state.pendingBookReads
-	sort.Sort(pendingBookReads)
-
-	var currentChunkIndex = 0
-	var currentBookRead = 0
-
-	for currentChunkIndex < len(chunkLocations) && currentBookRead < len(pendingBookReads) {
-		var chunkAddr = chunkLocations[currentChunkIndex]
-		var bookEntry = pendingBookReads[currentBookRead]
-
-		if chunkAddr < bookEntry.addr {
-			currentChunkIndex = currentChunkIndex + 1
-		} else if chunkAddr > bookEntry.addr {
-			currentBookRead = currentBookRead + 1
-		} else {
-			var bookCount = ((chunkLocations[currentChunkIndex+1] - chunkAddr) - 8) / 2
-			source.Seek(int64(chunkAddr+8), os.SEEK_SET)
-
-			for i := 0; int32(i) < bookCount; i = i + 1 {
-				var data int16
-				binary.Read(source, binary.BigEndian, &data)
-				bookEntry.book.Book = append(bookEntry.book.Book, data)
-			}
-
-			currentChunkIndex = currentChunkIndex + 1
-			currentBookRead = currentBookRead + 1
-		}
-	}
-
-	return nil
 }
 
 func ReadBankFile(source SeekableReader) (*ALBankFile, error) {
@@ -507,12 +436,6 @@ func ReadBankFile(source SeekableReader) (*ALBankFile, error) {
 
 	if !ok {
 		return nil, errors.New("Expected ALBankFile")
-	}
-
-	err = finishPendingBookReads(&state, source)
-
-	if err != nil {
-		return nil, err
 	}
 
 	return result, nil

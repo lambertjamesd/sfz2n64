@@ -41,6 +41,7 @@ func (state *alSerializeState) layoutSerializable(target alSerializable) {
 		if padding != 0 {
 			padding = align - padding
 			state.pending = append(state.pending, &alPadding{padding})
+			state.currentLocation = state.currentLocation + padding
 		}
 
 		state.offsetMapping[target] = state.currentLocation
