@@ -8,6 +8,7 @@ const (
 )
 
 const ADPCMFSIZE = 16
+const BANK_REVISION = 0x4231
 
 type ADPCM_STATE [ADPCMFSIZE]int16
 
@@ -44,8 +45,8 @@ type ALWavetable struct {
 	Len  int32
 	Type ALWaveType
 	// Flags    uint8
-	AdpcWave *ALADPCMWaveInfo
-	RawWave  *ALRAWWaveInfo
+	AdpcWave ALADPCMWaveInfo
+	RawWave  ALRAWWaveInfo
 }
 
 type ALKeyMap struct {
@@ -95,7 +96,7 @@ type ALInstrument struct {
 type ALBank struct {
 	// InstCount  int16
 	// Flags      uint8
-	Pad        uint8
+	// Pad        uint8
 	SampleRate uint32
 	Percussion *ALInstrument
 	InstArray  []*ALInstrument

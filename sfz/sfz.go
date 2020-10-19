@@ -1,4 +1,4 @@
-package main
+package sfz
 
 import (
 	"io/ioutil"
