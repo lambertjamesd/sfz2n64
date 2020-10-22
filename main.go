@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/lambertjamesd/sfz2n64/aiff"
 	"github.com/lambertjamesd/sfz2n64/al64"
 	"github.com/lambertjamesd/sfz2n64/sfz"
 )
@@ -51,6 +52,24 @@ func main() {
 		}
 
 		fmt.Printf("Parsted tbl %s with %d banks", input, len(bankFile.BankArray))
+	} else if filepath.Ext(input) == ".aifc" {
+		file, err := os.Open(input)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		aiff, err := aiff.Parse(file)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if aiff.Compressed {
+			log.Println("Compressed")
+		} else {
+			log.Println("Not Compressed")
+		}
 	} else {
 		log.Fatal(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file", input))
 	}

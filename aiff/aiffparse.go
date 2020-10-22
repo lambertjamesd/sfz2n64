@@ -85,19 +85,21 @@ func parseCommonChunk(reader SeekableReader, compressed bool) (*CommonChunk, err
 
 	result.SampleRate = sampleRate
 
-	err = binary.Read(reader, binary.BigEndian, &result.CompressionType)
+	if compressed {
+		err = binary.Read(reader, binary.BigEndian, &result.CompressionType)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+
+		compressionName, err := readPString(reader)
+
+		if err != nil {
+			return nil, err
+		}
+
+		result.CompressionName = compressionName
 	}
-
-	compressionName, err := readPString(reader)
-
-	if err != nil {
-		return nil, err
-	}
-
-	result.CompressionName = compressionName
 
 	return &result, nil
 }

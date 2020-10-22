@@ -10,6 +10,7 @@ const INST = 0x494E5354
 const SSND = 0x53534E44
 const APPL = 0x4150504C
 
+// Sign * 1.Mantissa * pow(2, Exponent - 0x3FFF)
 type ExtendedFloat struct {
 	Sign     bool
 	Exponent uint16
