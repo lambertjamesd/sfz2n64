@@ -9,6 +9,7 @@ const COMM = 0x434F4D4D
 const INST = 0x494E5354
 const SSND = 0x53534E44
 const APPL = 0x4150504C
+const MARK = 0x4D41524B
 
 // Sign * 1.Mantissa * pow(2, Exponent - 0x3FFF)
 type ExtendedFloat struct {
@@ -27,8 +28,8 @@ type CommonChunk struct {
 }
 
 type Marker struct {
-	ID       int16
-	Position int32
+	ID       uint16
+	Position uint32
 	Name     string
 }
 
@@ -38,8 +39,8 @@ type MarkerChunk struct {
 
 type Loop struct {
 	PlayMode  int16
-	BeginLoop int16
-	EndLoop   int16
+	BeginLoop uint16
+	EndLoop   uint16
 }
 
 type InstrumentChunk struct {
@@ -63,6 +64,11 @@ type SoundDataChunk struct {
 	Offset       uint32
 	BlockSize    uint32
 	WaveformData []byte
+}
+
+type chunkData struct {
+	header uint32
+	data   []byte
 }
 
 type Aiff struct {

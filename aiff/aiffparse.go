@@ -172,6 +172,33 @@ func parseApplicationChunk(reader SeekableReader, chunkSize uint32) (*Applicatio
 	return &result, err
 }
 
+func parseMakerChunk(reader SeekableReader) (*MarkerChunk, error) {
+	var result MarkerChunk
+
+	var numMarkers uint16
+
+	binary.Read(reader, binary.BigEndian, &numMarkers)
+
+	for i := uint16(0); i < numMarkers; i = i + 1 {
+		var marker Marker
+
+		binary.Read(reader, binary.BigEndian, &marker.ID)
+		binary.Read(reader, binary.BigEndian, &marker.Position)
+
+		name, err := readPString(reader)
+
+		if err != nil {
+			return nil, err
+		}
+
+		marker.Name = name
+
+		result.Markers = append(result.Markers, marker)
+	}
+
+	return &result, nil
+}
+
 func Parse(reader SeekableReader) (*Aiff, error) {
 	var result Aiff
 
@@ -229,6 +256,8 @@ func Parse(reader SeekableReader) (*Aiff, error) {
 				}
 
 				result.Application = append(result.Application, appl)
+			case MARK:
+				result.Markers, err = parseMakerChunk(reader)
 			}
 
 			if err != nil {

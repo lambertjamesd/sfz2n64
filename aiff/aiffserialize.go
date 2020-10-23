@@ -38,6 +38,8 @@ func writePString(out io.Writer, val string) error {
 			}
 		}
 	}
+
+	return nil
 }
 
 func pStringLen(val string) uint32 {
@@ -57,35 +59,19 @@ func writeExtendedFloat(out io.Writer, exFloat *ExtendedFloat) {
 		expSign = expSign | 0x8000
 	}
 
-	binary.Write(out, binary.BigEndian, &exFloat)
+	binary.Write(out, binary.BigEndian, &expSign)
 	binary.Write(out, binary.BigEndian, &exFloat.Mantissa)
 }
 
-func (commonChunk *CommonChunk) serialize(compressed bool) (*bytes.Buffer, error) {
+func (commonChunk *CommonChunk) serialize(compressed bool) (*chunkData, error) {
 	var result bytes.Buffer
 
-	var header uint32 = COMM
-	err := binary.Write(&result, binary.BigEndian, &header)
+	err := binary.Write(&result, binary.BigEndian, &commonChunk.NumChannels)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var chunkLen uint32
-
-	if compressed {
-		chunkLen = 22 + pStringLen(commonChunk.CompressionName)
-	} else {
-		chunkLen = 18
-	}
-
-	err = binary.Write(&result, binary.BigEndian, &chunkLen)
-
-	if err != nil {
-		return nil, err
-	}
-
-	binary.Write(&result, binary.BigEndian, &commonChunk.NumChannels)
 	binary.Write(&result, binary.BigEndian, &commonChunk.NumSampleFrames)
 	binary.Write(&result, binary.BigEndian, &commonChunk.SampleSize)
 
@@ -94,26 +80,125 @@ func (commonChunk *CommonChunk) serialize(compressed bool) (*bytes.Buffer, error
 	if compressed {
 		binary.Write(&result, binary.BigEndian, &commonChunk.CompressionType)
 		err = writePString(&result, commonChunk.CompressionName)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return &result, nil
+	return &chunkData{COMM, result.Bytes()}, nil
+}
+
+func (markerChunk *MarkerChunk) serialize() (*chunkData, error) {
+	var result bytes.Buffer
+
+	var count uint16 = uint16(len(markerChunk.Markers))
+	binary.Write(&result, binary.BigEndian, &count)
+
+	for _, marker := range markerChunk.Markers {
+		binary.Write(&result, binary.BigEndian, &marker.ID)
+		binary.Write(&result, binary.BigEndian, &marker.Position)
+
+		writePString(&result, marker.Name)
+	}
+
+	return &chunkData{MARK, result.Bytes()}, nil
+}
+
+func (instrumentChunk *InstrumentChunk) serialize() (*chunkData, error) {
+	var result bytes.Buffer
+
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.BaseNote)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.Detune)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.LowNote)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.HighNote)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.LowVelocity)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.HighVelocity)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.Gain)
+
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.SustainLoop.PlayMode)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.SustainLoop.BeginLoop)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.SustainLoop.EndLoop)
+
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.ReleaseLoop.PlayMode)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.ReleaseLoop.BeginLoop)
+	binary.Write(&result, binary.BigEndian, &instrumentChunk.ReleaseLoop.EndLoop)
+
+	return &chunkData{INST, result.Bytes()}, nil
+}
+
+func (soundData *SoundDataChunk) serialize() (*chunkData, error) {
+	var result bytes.Buffer
+
+	binary.Write(&result, binary.BigEndian, &soundData.Offset)
+	binary.Write(&result, binary.BigEndian, &soundData.BlockSize)
+	result.Write(soundData.WaveformData)
+
+	return &chunkData{SSND, result.Bytes()}, nil
+}
+
+func (applicationData *ApplicationChunk) serialize() (*chunkData, error) {
+	var result bytes.Buffer
+
+	binary.Write(&result, binary.BigEndian, &applicationData.Signature)
+	result.Write(applicationData.Data)
+
+	return &chunkData{APPL, result.Bytes()}, nil
+}
+
+func (aiff *Aiff) serializeChunks() ([]*chunkData, error) {
+	var bufferChunks []*chunkData
+
+	commonChunk, err := aiff.Common.serialize(aiff.Compressed)
+	if err != nil {
+		return nil, err
+	}
+	bufferChunks = append(bufferChunks, commonChunk)
+
+	if aiff.Markers != nil {
+		markerChunk, err := aiff.Markers.serialize()
+		if err != nil {
+			return nil, err
+		}
+		bufferChunks = append(bufferChunks, markerChunk)
+	}
+
+	if aiff.Instrument != nil {
+		instrumentChunk, err := aiff.Instrument.serialize()
+		if err != nil {
+			return nil, err
+		}
+		bufferChunks = append(bufferChunks, instrumentChunk)
+	}
+
+	for _, appChunk := range aiff.Application {
+		applicationChunk, err := appChunk.serialize()
+		if err != nil {
+			return nil, err
+		}
+		bufferChunks = append(bufferChunks, applicationChunk)
+	}
+
+	soundChunk, err := aiff.SoundData.serialize()
+	if err != nil {
+		return nil, err
+	}
+	bufferChunks = append(bufferChunks, soundChunk)
+
+	return bufferChunks, nil
 }
 
 func (aiff *Aiff) Serialize(writer io.Writer) error {
-	var bufferChunks []*bytes.Buffer
-
-	commonChunk, err := aiff.Common.serialize(aiff.Compressed)
+	bufferChunks, err := aiff.serializeChunks()
 
 	if err != nil {
 		return err
 	}
 
-	bufferChunks = append(bufferChunks, commonChunk)
-
 	var totalLength uint32 = 0
 
 	for _, chunk := range bufferChunks {
-		totalLength = totalLength + uint32(chunk.Len())
+		totalLength = totalLength + uint32(len(chunk.data)+8)
 	}
 
 	var header uint32 = FORM_HEADER
@@ -142,7 +227,20 @@ func (aiff *Aiff) Serialize(writer io.Writer) error {
 	}
 
 	for _, chunk := range bufferChunks {
-		_, err := writer.Write(chunk.Bytes())
+		err := binary.Write(writer, binary.BigEndian, &chunk.header)
+
+		if err != nil {
+			return err
+		}
+
+		var chunkLen = uint32(len(chunk.data))
+		err = binary.Write(writer, binary.BigEndian, &chunkLen)
+
+		if err != nil {
+			return err
+		}
+
+		_, err = writer.Write(chunk.data)
 
 		if err != nil {
 			return err
