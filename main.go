@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/lambertjamesd/sfz2n64/aiff"
 	"github.com/lambertjamesd/sfz2n64/al64"
+	"github.com/lambertjamesd/sfz2n64/convert"
 	"github.com/lambertjamesd/sfz2n64/sfz"
 )
 
@@ -19,6 +21,7 @@ func main() {
 	var input = os.Args[1]
 
 	var ext = filepath.Ext(input)
+	var output = os.Args[2]
 
 	if ext == ".sfz" {
 		sfzFile, err := sfz.ParseSfz(input)
@@ -35,25 +38,27 @@ func main() {
 			log.Fatal(err)
 		}
 
+		defer file.Close()
+
 		bankFile, err := al64.ReadBankFile(file)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		output, err := os.OpenFile(input+".recomp", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
+		tblData, err := ioutil.ReadFile(input[0:len(input)-4] + ".tbl")
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		err = bankFile.Serialize(output)
+		err = convert.WriteInsFile(bankFile, tblData, output)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("Parsted tbl %s with %d banks", input, len(bankFile.BankArray))
+		fmt.Printf("Wrote instrument file to %s", output)
 	} else if ext == ".aifc" || ext == ".aiff" {
 		file, err := os.Open(input)
 
