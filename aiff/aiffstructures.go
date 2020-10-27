@@ -79,3 +79,11 @@ type Aiff struct {
 	Instrument  *InstrumentChunk
 	Application []*ApplicationChunk
 }
+
+func ExtendedFromF64(val float64) ExtendedFloat {
+	return ExtendedFloat{}
+}
+
+func F64FromExtended(val ExtendedFloat) float64 {
+	return 0
+}
