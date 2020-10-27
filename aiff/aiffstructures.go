@@ -1,5 +1,7 @@
 package aiff
 
+import "math"
+
 const FORM_HEADER = 0x464F524D
 
 const AIFC = 0x41494643
@@ -81,9 +83,35 @@ type Aiff struct {
 }
 
 func ExtendedFromF64(val float64) ExtendedFloat {
-	return ExtendedFloat{}
+	var asInt = math.Float64bits(val)
+
+	var sign = asInt & 0x8000000000000000
+	var exponent = (asInt ^ sign) >> 52
+	var mantissa = asInt & 0xFFFFFFFFFFFFF
+
+	exponent = exponent + 0x3FFF - 1023
+
+	mantissa = 0x8000000000000000 | (mantissa << (63 - 52))
+
+	return ExtendedFloat{
+		sign != 0,
+		uint16(exponent),
+		mantissa,
+	}
 }
 
 func F64FromExtended(val ExtendedFloat) float64 {
-	return 0
+	if val.Exponent == 0 && val.Mantissa == 0 {
+		return 0
+	}
+
+	var sign float64 = 1
+
+	if val.Sign {
+		sign = -1
+	}
+
+	var mant = float64(val.Mantissa) / math.Pow(2, 63)
+
+	return sign * mant * math.Pow(2, float64(val.Exponent)-0x3FFF)
 }

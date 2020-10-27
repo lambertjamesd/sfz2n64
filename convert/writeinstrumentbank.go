@@ -106,7 +106,7 @@ func writeWavetable(state *insConversionState, source interface{}, output *os.Fi
 			NumChannels:     1,
 			NumSampleFrames: wave.Len * 16 / 9,
 			SampleSize:      16,
-			SampleRate:      aiff.ExtendedFromF64(44100.0),
+			SampleRate:      aiff.ExtendedFromF64(float64(state.sampleRate)),
 			CompressionType: 0x56415043,
 			CompressionName: "VADPCM ~4-1",
 		}
