@@ -120,8 +120,10 @@ func writeWavetable(state *insConversionState, source interface{}, output *os.Fi
 		var version uint16 = 1
 		binary.Write(&codesBuffer, binary.BigEndian, &version)
 
-		binary.Write(&codesBuffer, binary.BigEndian, &wave.AdpcWave.Book.Order)
-		binary.Write(&codesBuffer, binary.BigEndian, &wave.AdpcWave.Book.NPredictors)
+		version = uint16(wave.AdpcWave.Book.Order)
+		binary.Write(&codesBuffer, binary.BigEndian, &version)
+		version = uint16(wave.AdpcWave.Book.NPredictors)
+		binary.Write(&codesBuffer, binary.BigEndian, &version)
 
 		for _, val := range wave.AdpcWave.Book.Book {
 			binary.Write(&codesBuffer, binary.BigEndian, &val)
