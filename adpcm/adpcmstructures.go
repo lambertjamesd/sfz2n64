@@ -9,9 +9,28 @@ type Frame struct {
 
 type Predictor struct {
 	Table [PREDICTOR_SIZE][]int32
-	Order int
 }
 
 type Codebook struct {
 	Predictors []Predictor
+	Order      int
+}
+
+type Loop struct {
+	Start int
+	End   int
+	Count int
+	State [16]int16
+}
+
+type ADPCMEncodedData struct {
+	NSamples   int
+	SampleRate float64
+	Codebook   *Codebook
+	Loop       *Loop
+	Frames     []Frame
+}
+
+type PCMEncodedData struct {
+	Samples []int16
 }

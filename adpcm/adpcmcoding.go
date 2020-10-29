@@ -19,7 +19,7 @@ func innerProduct(length int, v1 []int32, v2 [16]int32) int32 {
 
 const MAX_LEVEL = 7
 
-func decodeFrame(frame *Frame, codebook *Codebook, order int, state []int32) {
+func decodeFrame(frame *Frame, codebook *Codebook, state []int32) {
 	var ix [16]int32
 
 	var scale = 1 << (frame.Header >> 4)
@@ -44,22 +44,22 @@ func decodeFrame(frame *Frame, codebook *Codebook, order int, state []int32) {
 		var inputVector [16]int32
 
 		for i := 0; i < 8; i = i + 1 {
-			inputVector[i+order] = ix[j*8+i]
+			inputVector[i+codebook.Order] = ix[j*8+i]
 		}
 
 		if j == 0 {
-			for i := 0; i < order; i = i + 1 {
-				inputVector[i] = state[16-order+i]
+			for i := 0; i < codebook.Order; i = i + 1 {
+				inputVector[i] = state[16-codebook.Order+i]
 			}
 		} else {
-			for i := 0; i < order; i = i + 1 {
-				inputVector[i] = state[8-order+i]
+			for i := 0; i < codebook.Order; i = i + 1 {
+				inputVector[i] = state[8-codebook.Order+i]
 			}
 		}
 
 		for i := 0; i < 8; i = i + 1 {
 			state[j*8+i] = innerProduct(
-				order+8,
+				codebook.Order+8,
 				codebook.Predictors[optimalp].Table[i],
 				inputVector,
 			)
@@ -111,6 +111,16 @@ func clamp(fs int32, e [16]float32, ie [16]int32, bits int32) {
 	}
 }
 
+func clampToS16(x int32) int16 {
+	if x < -0x8000 {
+		return -0x8000
+	}
+	if x > 0x7fff {
+		return 0x7fff
+	}
+	return int16(x)
+}
+
 func clip(ix int32, llevel int32, ulevel int32) int32 {
 	if ix < llevel || ix > ulevel {
 		if ix < llevel {
@@ -123,7 +133,7 @@ func clip(ix int32, llevel int32, ulevel int32) int32 {
 	return ix
 }
 
-func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *Frame {
+func encodeFrame(input []int16, state []int32, codebook *Codebook) *Frame {
 	var ix [16]int16
 	var inBuffer [16]int16
 
@@ -163,35 +173,35 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *F
 	optimalp = 0
 	for k := 0; k < len(codebook.Predictors); k = k + 1 {
 		// Copy over the last 'order' samples from the previous output.
-		for i := 0; i < order; i = i + 1 {
-			inVector[i] = state[16-order+i]
+		for i := 0; i < codebook.Order; i = i + 1 {
+			inVector[i] = state[16-codebook.Order+i]
 		}
 
 		// For 8 samples...
 		for i := 0; i < 8; i = i + 1 {
-			// Compute a prediction based on 'order' values from the old state,
+			// Compute a prediction based on 'codebook.Order' values from the old state,
 			// plus previous errors in this chunk, as an inner product with the
 			// coefficient table.
-			prediction[i] = innerProduct(order+i, codebook.Predictors[k].Table[i], inVector)
-			// Record the error in inVector (thus, its first 'order' samples
+			prediction[i] = innerProduct(codebook.Order+i, codebook.Predictors[k].Table[i], inVector)
+			// Record the error in inVector (thus, its first 'codebook.Order' samples
 			// will contain actual values, the rest will be error terms), and
 			// in floating point form in e (for no particularly good reason).
-			inVector[i+order] = int32(inBuffer[i]) - prediction[i]
-			e[i] = float32(inVector[i+order])
+			inVector[i+codebook.Order] = int32(inBuffer[i]) - prediction[i]
+			e[i] = float32(inVector[i+codebook.Order])
 		}
 
 		// For the next 8 samples, start with 'order' values from the end of
 		// the previous 8-sample chunk of inBuffer. (The code is equivalent to
 		// inVector[i] = inBuffer[8 - order + i].)
-		for i := 0; i < order; i = i + 1 {
-			inVector[i] = prediction[8-order+i] + inVector[8+i]
+		for i := 0; i < codebook.Order; i = i + 1 {
+			inVector[i] = prediction[8-codebook.Order+i] + inVector[8+i]
 		}
 
 		// ... and do the same thing as before to get predictions.
 		for i := 0; i < 8; i = i + 1 {
-			prediction[8+i] = innerProduct(order+i, codebook.Predictors[k].Table[i], inVector)
-			inVector[i+order] = int32(inBuffer[8+i]) - prediction[8+i]
-			e[8+i] = float32(inVector[i+order])
+			prediction[8+i] = innerProduct(codebook.Order+i, codebook.Predictors[k].Table[i], inVector)
+			inVector[i+codebook.Order] = int32(inBuffer[8+i]) - prediction[8+i]
+			e[8+i] = float32(inVector[i+codebook.Order])
 		}
 
 		// Compute the L2 norm of the errors; the lowest norm decides which
@@ -208,24 +218,24 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *F
 	}
 
 	// Do exactly the same thing again, for real.
-	for i := 0; i < order; i = i + 1 {
-		inVector[i] = state[16-order+i]
+	for i := 0; i < codebook.Order; i = i + 1 {
+		inVector[i] = state[16-codebook.Order+i]
 	}
 
 	for i := 0; i < 8; i = i + 1 {
-		prediction[i] = innerProduct(order+i, codebook.Predictors[optimalp].Table[i], inVector)
-		inVector[i+order] = int32(inBuffer[i]) - prediction[i]
-		e[i] = float32(inVector[i+order])
+		prediction[i] = innerProduct(codebook.Order+i, codebook.Predictors[optimalp].Table[i], inVector)
+		inVector[i+codebook.Order] = int32(inBuffer[i]) - prediction[i]
+		e[i] = float32(inVector[i+codebook.Order])
 	}
 
-	for i := 0; i < order; i = i + 1 {
-		inVector[i] = prediction[8-order+i] + inVector[8+i]
+	for i := 0; i < codebook.Order; i = i + 1 {
+		inVector[i] = prediction[8-codebook.Order+i] + inVector[8+i]
 	}
 
 	for i := 0; i < 8; i = i + 1 {
-		prediction[8+i] = innerProduct(order+i, codebook.Predictors[optimalp].Table[i], inVector)
-		inVector[i+order] = int32(inBuffer[8+i]) - prediction[8+i]
-		e[8+i] = float32(inVector[i+order])
+		prediction[8+i] = innerProduct(codebook.Order+i, codebook.Predictors[optimalp].Table[i], inVector)
+		inVector[i+codebook.Order] = int32(inBuffer[8+i]) - prediction[8+i]
+		e[8+i] = float32(inVector[i+codebook.Order])
 	}
 
 	// Clamp the errors to 16-bit signed ints, and put them in ie.
@@ -272,8 +282,8 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *F
 		}
 
 		// Copy over the last 'order' samples from the previous output.
-		for i := 0; i < order; i = i + 1 {
-			inVector[i] = saveState[16-order+i]
+		for i := 0; i < codebook.Order; i = i + 1 {
+			inVector[i] = saveState[16-codebook.Order+i]
 		}
 
 		// For 8 samples...
@@ -281,7 +291,7 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *F
 			// Compute a prediction based on 'order' values from the old state,
 			// plus previous *quantized* errors in this chunk (because that's
 			// all the decoder will have available).
-			prediction[i] = innerProduct(order+i, codebook.Predictors[optimalp].Table[i], inVector)
+			prediction[i] = innerProduct(codebook.Order+i, codebook.Predictors[optimalp].Table[i], inVector)
 
 			// Compute the error, and divide it by 2^scale, rounding to the
 			// nearest integer. This should ideally result in a 4-bit integer.
@@ -299,18 +309,18 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *F
 			// Record the quantized error in inVector for later predictions,
 			// and the quantized (decoded) output in state (for use in the next
 			// batch of 8 samples).
-			inVector[i+order] = int32(ix[i]) * (1 << scale)
-			state[i] = prediction[i] + inVector[i+order]
+			inVector[i+codebook.Order] = int32(ix[i]) * (1 << scale)
+			state[i] = prediction[i] + inVector[i+codebook.Order]
 		}
 
 		// Copy over the last 'order' decoded samples from the above chunk.
-		for i := 0; i < order; i = i + 1 {
-			inVector[i] = state[8-order+i]
+		for i := 0; i < codebook.Order; i = i + 1 {
+			inVector[i] = state[8-codebook.Order+i]
 		}
 
 		// ... and do the same thing as before.
 		for i := 0; i < 8; i = i + 1 {
-			prediction[8+i] = innerProduct(order+i, codebook.Predictors[optimalp].Table[i], inVector)
+			prediction[8+i] = innerProduct(codebook.Order+i, codebook.Predictors[optimalp].Table[i], inVector)
 			se = float32(inBuffer[8+i]) - float32(prediction[8+i])
 			ix[8+i] = qsample(se, 1<<scale)
 			cV = int16(clip(int32(ix[8+i]), llevel, ulevel)) - int16(ix[8+i])
@@ -318,8 +328,8 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *F
 				maxClip = iabs(int32(cV))
 			}
 			ix[8+i] += cV
-			inVector[i+order] = int32(ix[8+i]) * (1 << scale)
-			state[8+i] = prediction[8+i] + inVector[i+order]
+			inVector[i+codebook.Order] = int32(ix[8+i]) * (1 << scale)
+			state[8+i] = prediction[8+i] + inVector[i+codebook.Order]
 		}
 
 		isLooping = maxClip >= 2 && nIter < 2
@@ -329,6 +339,94 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook, order int) *F
 
 	for i := 0; i < 16; i = i + 2 {
 		result.Data[i/2] = uint8(ix[i]<<4) | uint8(ix[i+1]&0xf)
+	}
+
+	return &result
+}
+
+var myrandState uint64 = 1619236481962341
+
+func myrand() int32 {
+	myrandState = myrandState * 3123692312231
+	myrandState = myrandState + 1
+	return int32(myrandState >> 33)
+}
+
+func permute(out []int16, in []int32, scale int32) {
+	for i := 0; i < 16; i = i + 1 {
+		out[i] = clampToS16(in[i] - scale/2 + myrand()%(scale+1))
+	}
+}
+
+func decodeADPCM(data *ADPCMEncodedData) *PCMEncodedData {
+	var state []int32 = make([]int32, 16)
+	var result PCMEncodedData
+
+	result.Samples = make([]int16, data.NSamples)
+	var currPos = 0
+	var currFrame = 0
+
+	for currPos < data.NSamples {
+		var lastState []int32 = make([]int32, 16)
+		copy(lastState, state)
+		var input = data.Frames[currFrame]
+		currFrame = currFrame + 1
+
+		decodeFrame(&input, data.Codebook, state)
+
+		var decoded = make([]int32, 16)
+		copy(decoded, state)
+
+		var origGuess = make([]int16, 16)
+
+		// Create a guess from that, by clamping to 16 bits
+		for i := 0; i < 16; i = i + 1 {
+			origGuess[i] = clampToS16(state[i])
+		}
+
+		var guess = make([]int16, 16)
+		copy(state, lastState)
+		copy(guess, origGuess)
+		var encoded = encodeFrame(guess, state, data.Codebook)
+
+		// If it doesn't match, randomly round numbers until it does.
+		if input != *encoded {
+			var scale = int32(1 << int32(input.Header>>4))
+			for input != *encoded {
+				permute(guess, decoded, scale)
+				copy(state, lastState)
+				encoded = encodeFrame(guess, state, data.Codebook)
+			}
+
+			// Bring the matching closer to the original decode (not strictly
+			// necessary, but it will move us closer to the target on average).
+			for failures := 0; failures < 50; failures = failures + 1 {
+				var ind = myrand() % 16
+				var old = guess[ind]
+				if old == origGuess[ind] {
+					continue
+				}
+				guess[ind] = origGuess[ind]
+				if myrand()%2 != 0 {
+					guess[ind] += (old - origGuess[ind]) / 2
+				}
+				copy(state, lastState)
+				encoded = encodeFrame(guess, state, data.Codebook)
+				if input == *encoded {
+					failures = -1
+				} else {
+					guess[ind] = old
+				}
+			}
+		}
+
+		copy(state, decoded)
+
+		for guessIndex := 0; currPos < data.NSamples && guessIndex < 16; {
+			result.Samples[currPos] = guess[guessIndex]
+			guessIndex = guessIndex + 1
+			currPos = currPos + 1
+		}
 	}
 
 	return &result
