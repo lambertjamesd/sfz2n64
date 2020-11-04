@@ -22,47 +22,39 @@ const MAX_LEVEL = 7
 func decodeFrame(frame *Frame, codebook *Codebook, state []int32) {
 	var ix [16]int32
 
-	var scale = 1 << (frame.Header >> 4)
-	var optimalp = frame.Header & 0xf
+	var header = frame.Header
+	var scale = int32(1) << int32(header>>4)
+	var optimalp = header & 0xf
 
 	for i := 0; i < 16; i = i + 2 {
 		var c = frame.Data[i/2]
-		ix[i] = int32(c) >> 4
-		ix[i+1] = int32(c) & 0xf
+		ix[i] = int32(c >> 4)
+		ix[i+1] = int32(c & 0xf)
 	}
 
 	for i := 0; i < 16; i = i + 1 {
-		if ix[i] <= MAX_LEVEL {
-			ix[i] = ix[i] * int32(scale)
-		} else {
+		if ix[i] >= 8 {
 			ix[i] = ix[i] - 16
-			ix[i] = ix[i] * int32(scale)
 		}
+		ix[i] = ix[i] * scale
 	}
 
-	for j := 0; j < 2; j++ {
-		var inputVector [16]int32
-
-		for i := 0; i < 8; i = i + 1 {
-			inputVector[i+codebook.Order] = ix[j*8+i]
-		}
-
+	for j := 0; j < 2; j = j + 1 {
+		var in_vec [16]int32
 		if j == 0 {
 			for i := 0; i < codebook.Order; i = i + 1 {
-				inputVector[i] = state[16-codebook.Order+i]
+				in_vec[i] = state[16-codebook.Order+i]
 			}
 		} else {
 			for i := 0; i < codebook.Order; i = i + 1 {
-				inputVector[i] = state[8-codebook.Order+i]
+				in_vec[i] = state[8-codebook.Order+i]
 			}
 		}
 
 		for i := 0; i < 8; i = i + 1 {
-			state[j*8+i] = innerProduct(
-				codebook.Order+8,
-				codebook.Predictors[optimalp].Table[i],
-				inputVector,
-			)
+			var ind = j*8 + i
+			in_vec[codebook.Order+i] = ix[ind]
+			state[ind] = innerProduct(codebook.Order+i, codebook.Predictors[optimalp].Table[i], in_vec) + ix[ind]
 		}
 	}
 }
@@ -358,7 +350,7 @@ func permute(out []int16, in []int32, scale int32) {
 	}
 }
 
-func decodeADPCM(data *ADPCMEncodedData) *PCMEncodedData {
+func DecodeADPCM(data *ADPCMEncodedData) *PCMEncodedData {
 	var state []int32 = make([]int32, 16)
 	var result PCMEncodedData
 
@@ -391,12 +383,12 @@ func decodeADPCM(data *ADPCMEncodedData) *PCMEncodedData {
 
 		// If it doesn't match, randomly round numbers until it does.
 		if input != *encoded {
-			var scale = int32(1 << int32(input.Header>>4))
-			for input != *encoded {
-				permute(guess, decoded, scale)
-				copy(state, lastState)
-				encoded = encodeFrame(guess, state, data.Codebook)
-			}
+			// var scale = int32(1 << int32(input.Header>>4))
+			// for input != *encoded {
+			// 	permute(guess, decoded, scale)
+			// 	copy(state, lastState)
+			// 	encoded = encodeFrame(guess, state, data.Codebook)
+			// }
 
 			// Bring the matching closer to the original decode (not strictly
 			// necessary, but it will move us closer to the target on average).

@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-func expandPredictor(codebook *Predictor, order int) {
+func ExpandPredictor(codebook *Predictor, order int) {
 	for k := 1; k < PREDICTOR_SIZE; k = k + 1 {
 		codebook.Table[k][order] = codebook.Table[k-1][order-1]
 	}
@@ -83,8 +83,31 @@ func ReadBookFromAIFC(reader io.Reader) (*Codebook, error) {
 			return nil, err
 		}
 
-		expandPredictor(&result.Predictors[predictor], int(order))
+		ExpandPredictor(&result.Predictors[predictor], int(order))
 	}
 
 	return &result, nil
+}
+
+func ReadFrames(input []byte) []Frame {
+	var result []Frame = nil
+
+	for i := 0; i+8 < len(input); i = i + 9 {
+		var data [8]uint8
+
+		for dataIdx := 0; dataIdx < 8; dataIdx = dataIdx + 1 {
+			data[dataIdx] = uint8(input[i+1+dataIdx])
+		}
+
+		result = append(result, Frame{
+			input[i],
+			data,
+		})
+	}
+
+	return result
+}
+
+func NumberSamples(encodedLength int32) int32 {
+	return (encodedLength / 9) * 16
 }

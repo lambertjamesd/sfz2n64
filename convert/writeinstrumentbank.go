@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/lambertjamesd/sfz2n64/adpcm"
 	"github.com/lambertjamesd/sfz2n64/aiff"
 	"github.com/lambertjamesd/sfz2n64/al64"
 )
@@ -88,6 +89,58 @@ func (state *insConversionState) writeSection(source interface{}, output *os.Fil
 	return written, nil
 }
 
+func convertCodebook(alType *al64.ALADPCMBook) *adpcm.Codebook {
+	var result adpcm.Codebook
+
+	result.Order = int(alType.Order)
+
+	var inputIndex = 0
+
+	for pred := int32(0); pred < alType.NPredictors; pred = pred + 1 {
+		var predictor adpcm.Predictor
+
+		for idx := 0; idx < 8; idx = idx + 1 {
+			predictor.Table[idx] = make([]int32, result.Order+8)
+		}
+
+		for order := int32(0); order < alType.Order; order = order + 1 {
+			for idx := 0; idx < 8; idx = idx + 1 {
+				predictor.Table[idx][order] = int32(alType.Book[inputIndex])
+				inputIndex = inputIndex + 1
+			}
+		}
+
+		adpcm.ExpandPredictor(&predictor, result.Order)
+
+		result.Predictors = append(result.Predictors, predictor)
+	}
+
+	return &result
+}
+
+func convertLoop(alType *al64.ALADPCMloop) *adpcm.Loop {
+	if alType == nil {
+		return nil
+	} else {
+		return &adpcm.Loop{
+			int(alType.Start),
+			int(alType.End),
+			int(alType.Count),
+			alType.State,
+		}
+	}
+}
+
+func encodeSamples(data []int16) []byte {
+	var buffer bytes.Buffer
+
+	for _, val := range data {
+		binary.Write(&buffer, binary.BigEndian, &val)
+	}
+
+	return buffer.Bytes()
+}
+
 func writeWavetable(state *insConversionState, source interface{}, output *os.File) (string, error) {
 	wave, ok := source.(*al64.ALWavetable)
 
@@ -98,13 +151,29 @@ func writeWavetable(state *insConversionState, source interface{}, output *os.Fi
 	var name string
 	var aiffFile aiff.Aiff
 
+	var data = state.tblData[wave.Base : wave.Base+wave.Len]
+
+	if wave.Type == al64.AL_ADPCM_WAVE {
+		var sampleCount = adpcm.NumberSamples(wave.Len)
+		var frames = adpcm.DecodeADPCM(&adpcm.ADPCMEncodedData{
+			NSamples:   int(sampleCount),
+			SampleRate: float64(state.sampleRate),
+			Codebook:   convertCodebook(wave.AdpcWave.Book),
+			Loop:       convertLoop(wave.AdpcWave.Loop),
+			Frames:     adpcm.ReadFrames(data),
+		})
+
+		data = encodeSamples(frames.Samples)
+		wave.Type = al64.AL_RAW16_WAVE
+	}
+
 	if wave.Type == al64.AL_ADPCM_WAVE {
 		name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".aifc")
 		aiffFile.Compressed = true
 
 		aiffFile.Common = &aiff.CommonChunk{
 			NumChannels:     1,
-			NumSampleFrames: wave.Len * 16 / 9,
+			NumSampleFrames: adpcm.NumberSamples(wave.Len),
 			SampleSize:      16,
 			SampleRate:      aiff.ExtendedFromF64(float64(state.sampleRate)),
 			CompressionType: 0x56415043,
@@ -172,13 +241,37 @@ func writeWavetable(state *insConversionState, source interface{}, output *os.Fi
 			CompressionName: "",
 		}
 
-		// TODO Loop
+		if wave.RawWave.Loop != nil {
+			aiffFile.Markers = &aiff.MarkerChunk{
+				Markers: []aiff.Marker{aiff.Marker{
+					ID:       1,
+					Position: wave.RawWave.Loop.Start,
+					Name:     "start",
+				}, aiff.Marker{
+					ID:       2,
+					Position: wave.RawWave.Loop.End,
+					Name:     "end",
+				},
+				}}
+
+			aiffFile.Instrument = &aiff.InstrumentChunk{
+				BaseNote:     0,
+				Detune:       0,
+				LowNote:      0,
+				HighNote:     0,
+				LowVelocity:  0,
+				HighVelocity: 0,
+				Gain:         0,
+				SustainLoop:  aiff.Loop{PlayMode: 1, BeginLoop: 1, EndLoop: 2},
+				ReleaseLoop:  aiff.Loop{PlayMode: 0, BeginLoop: 0, EndLoop: 0},
+			}
+		}
 	}
 
 	aiffFile.SoundData = &aiff.SoundDataChunk{
 		Offset:       0,
 		BlockSize:    0,
-		WaveformData: state.tblData[wave.Base : wave.Base+wave.Len],
+		WaveformData: data,
 	}
 
 	if _, err := os.Stat(filepath.Join(state.cwd, "sounds")); os.IsNotExist(err) {
