@@ -67,6 +67,13 @@ func writeSfzEnvelope(envelope *al64.ALEnvelope, output *os.File) error {
 	return nil
 }
 
+func writeSfzLoop(start uint32, end uint32, output *os.File) {
+	output.WriteString(fmt.Sprintf(`loop_mode=loop_sustain
+loop_start=%d
+loop_end=%d
+`, start, end))
+}
+
 func writeSfzInstrument(state *insConversionState, source interface{}, output *os.File) (string, error) {
 	inst, ok := source.(*al64.ALInstrument)
 
@@ -87,6 +94,12 @@ func writeSfzInstrument(state *insConversionState, source interface{}, output *o
 	}
 
 	defer instFile.Close()
+
+	instFile.WriteString("\n<group>\n")
+
+	if inst.TremType != 0 {
+
+	}
 
 	for _, sound := range inst.SoundArray {
 		instFile.WriteString("\n<region>\n")
@@ -127,6 +140,12 @@ func writeSfzInstrument(state *insConversionState, source interface{}, output *o
 
 		writeSfzKeyMap(sound.KeyMap, instFile)
 		writeSfzEnvelope(sound.Envelope, instFile)
+
+		if sound.Wavetable.AdpcWave.Loop != nil {
+			writeSfzLoop(sound.Wavetable.AdpcWave.Loop.Start, sound.Wavetable.AdpcWave.Loop.End, instFile)
+		} else if sound.Wavetable.RawWave.Loop != nil {
+			writeSfzLoop(sound.Wavetable.RawWave.Loop.Start, sound.Wavetable.RawWave.Loop.End, instFile)
+		}
 	}
 
 	return name, nil
