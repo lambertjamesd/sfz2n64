@@ -62,8 +62,8 @@ type ALEnvelope struct {
 	AttackTime   int32
 	DecayTime    int32
 	ReleaseTime  int32
-	AttackVolume int16
-	DecayVolume  int16
+	AttackVolume uint8
+	DecayVolume  uint8
 }
 
 type ALSound struct {

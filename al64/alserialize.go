@@ -269,7 +269,7 @@ func (envelope *ALEnvelope) serializeWrite(state *alSerializeState, target io.Wr
 }
 
 func (envelope *ALEnvelope) sizeInBytes() int {
-	return 16
+	return 12
 }
 
 func (envelope *ALEnvelope) byteAlign() int {

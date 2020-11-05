@@ -52,7 +52,15 @@ func main() {
 			log.Fatal(err)
 		}
 
-		err = convert.WriteInsFile(bankFile, tblData, output)
+		var outExt = filepath.Ext(output)
+
+		if outExt == ".inst" {
+			err = convert.WriteInsFile(bankFile, tblData, output)
+		} else if outExt == ".sfz" {
+			err = convert.WriteSfzFile(bankFile, tblData, output)
+		} else {
+			log.Fatal("Outut file should be of type .inst or .sfz")
+		}
 
 		if err != nil {
 			log.Fatal(err)

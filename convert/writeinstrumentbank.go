@@ -1,145 +1,13 @@
 package convert
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/lambertjamesd/sfz2n64/adpcm"
-	"github.com/lambertjamesd/sfz2n64/aiff"
 	"github.com/lambertjamesd/sfz2n64/al64"
 )
-
-type writeIntoIns func(state *insConversionState, source interface{}, output *os.File) (string, error)
-
-type insConversionState struct {
-	cwd            string
-	nameHint       string
-	sampleRate     uint32
-	usedNames      map[string]bool
-	alreadyWritten map[interface{}]string
-	tblData        []byte
-}
-
-func fixName(name string) string {
-	var result []rune = nil
-
-	var first = true
-
-	for _, char := range name {
-		if first {
-			if char >= '0' && char <= '9' {
-				result = append(result, '_')
-			}
-
-			first = false
-		}
-
-		if char >= '0' && char <= '9' || char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' {
-			result = append(result, char)
-		} else if char == ' ' {
-			result = append(result, '_')
-		}
-	}
-
-	return string(result)
-}
-
-func (state *insConversionState) getUniqueName(ext string) string {
-	var index = 1
-	var fixedName = fixName(state.nameHint) + ext
-
-	var searching = true
-
-	for searching {
-		_, has := state.usedNames[fixedName]
-
-		if has {
-			index = index + 1
-			fixedName = fmt.Sprintf("%s%d", fixName(state.nameHint), index) + ext
-		} else {
-			searching = false
-			state.usedNames[fixedName] = true
-		}
-	}
-
-	return fixedName
-}
-
-func (state *insConversionState) writeSection(source interface{}, output *os.File, nameHint string, writer writeIntoIns) (string, error) {
-	written, ok := state.alreadyWritten[source]
-
-	if !ok {
-		var prevHint = state.nameHint
-		state.nameHint = nameHint
-		name, err := writer(state, source, output)
-		state.nameHint = prevHint
-
-		if err != nil {
-			return "", err
-		}
-
-		state.alreadyWritten[source] = name
-		written = name
-	}
-
-	return written, nil
-}
-
-func convertCodebook(alType *al64.ALADPCMBook) *adpcm.Codebook {
-	var result adpcm.Codebook
-
-	result.Order = int(alType.Order)
-
-	var inputIndex = 0
-
-	for pred := int32(0); pred < alType.NPredictors; pred = pred + 1 {
-		var predictor adpcm.Predictor
-
-		for idx := 0; idx < 8; idx = idx + 1 {
-			predictor.Table[idx] = make([]int32, result.Order+8)
-		}
-
-		for order := int32(0); order < alType.Order; order = order + 1 {
-			for idx := 0; idx < 8; idx = idx + 1 {
-				predictor.Table[idx][order] = int32(alType.Book[inputIndex])
-				inputIndex = inputIndex + 1
-			}
-		}
-
-		adpcm.ExpandPredictor(&predictor, result.Order)
-
-		result.Predictors = append(result.Predictors, predictor)
-	}
-
-	return &result
-}
-
-func convertLoop(alType *al64.ALADPCMloop) *adpcm.Loop {
-	if alType == nil {
-		return nil
-	} else {
-		return &adpcm.Loop{
-			int(alType.Start),
-			int(alType.End),
-			int(alType.Count),
-			alType.State,
-		}
-	}
-}
-
-func encodeSamples(data []int16) []byte {
-	var buffer bytes.Buffer
-
-	for _, val := range data {
-		binary.Write(&buffer, binary.BigEndian, &val)
-	}
-
-	return buffer.Bytes()
-}
 
 func writeWavetable(state *insConversionState, source interface{}, output *os.File) (string, error) {
 	wave, ok := source.(*al64.ALWavetable)
@@ -148,147 +16,20 @@ func writeWavetable(state *insConversionState, source interface{}, output *os.Fi
 		return "", errors.New("Expected ALWavetable")
 	}
 
-	var name string
-	var aiffFile aiff.Aiff
-
 	var data = state.tblData[wave.Base : wave.Base+wave.Len]
 
 	if wave.Type == al64.AL_ADPCM_WAVE {
-		var sampleCount = adpcm.NumberSamples(wave.Len)
-		var frames = adpcm.DecodeADPCM(&adpcm.ADPCMEncodedData{
-			NSamples:   int(sampleCount),
-			SampleRate: float64(state.sampleRate),
-			Codebook:   convertCodebook(wave.AdpcWave.Book),
-			Loop:       convertLoop(wave.AdpcWave.Loop),
-			Frames:     adpcm.ReadFrames(data),
-		})
+		var name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".aifc")
+		var err = writeAifc(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
 
-		data = encodeSamples(frames.Samples)
-		wave.Type = al64.AL_RAW16_WAVE
-	}
+		err = writeWav(filepath.Join(state.cwd, name[0:len(name)-4]+"wav"), wave, data, state.sampleRate)
 
-	if wave.Type == al64.AL_ADPCM_WAVE {
-		name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".aifc")
-		aiffFile.Compressed = true
-
-		aiffFile.Common = &aiff.CommonChunk{
-			NumChannels:     1,
-			NumSampleFrames: adpcm.NumberSamples(wave.Len),
-			SampleSize:      16,
-			SampleRate:      aiff.ExtendedFromF64(float64(state.sampleRate)),
-			CompressionType: 0x56415043,
-			CompressionName: "VADPCM ~4-1",
-		}
-
-		var codesBuffer bytes.Buffer
-
-		var len uint8 = 0xB
-		binary.Write(&codesBuffer, binary.BigEndian, &len)
-		codesBuffer.WriteString("VADPCMCODES")
-
-		var version uint16 = 1
-		binary.Write(&codesBuffer, binary.BigEndian, &version)
-
-		version = uint16(wave.AdpcWave.Book.Order)
-		binary.Write(&codesBuffer, binary.BigEndian, &version)
-		version = uint16(wave.AdpcWave.Book.NPredictors)
-		binary.Write(&codesBuffer, binary.BigEndian, &version)
-
-		for _, val := range wave.AdpcWave.Book.Book {
-			binary.Write(&codesBuffer, binary.BigEndian, &val)
-		}
-
-		aiffFile.Application = append(aiffFile.Application, &aiff.ApplicationChunk{
-			Signature: 0x73746F63,
-			Data:      codesBuffer.Bytes(),
-		})
-
-		if wave.AdpcWave.Loop != nil {
-			var loopBuffer bytes.Buffer
-
-			var len uint8 = 0xB
-			binary.Write(&loopBuffer, binary.BigEndian, &len)
-			loopBuffer.WriteString("VADPCMLOOPS")
-
-			var version uint16 = 1
-			binary.Write(&loopBuffer, binary.BigEndian, &version)
-			// num loops
-			binary.Write(&loopBuffer, binary.BigEndian, &version)
-
-			binary.Write(&loopBuffer, binary.BigEndian, &wave.AdpcWave.Loop.Start)
-			binary.Write(&loopBuffer, binary.BigEndian, &wave.AdpcWave.Loop.End)
-			binary.Write(&loopBuffer, binary.BigEndian, &wave.AdpcWave.Loop.Count)
-
-			for _, val := range wave.AdpcWave.Loop.State {
-				binary.Write(&loopBuffer, binary.BigEndian, &val)
-			}
-
-			aiffFile.Application = append(aiffFile.Application, &aiff.ApplicationChunk{
-				Signature: 0x73746F63,
-				Data:      loopBuffer.Bytes(),
-			})
-		}
+		return name, err
 	} else {
-		name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".aiff")
-		aiffFile.Compressed = false
-
-		aiffFile.Common = &aiff.CommonChunk{
-			NumChannels:     1,
-			NumSampleFrames: wave.Len / 2,
-			SampleSize:      16,
-			SampleRate:      aiff.ExtendedFromF64(44100.0),
-			CompressionType: 0,
-			CompressionName: "",
-		}
-
-		if wave.RawWave.Loop != nil {
-			aiffFile.Markers = &aiff.MarkerChunk{
-				Markers: []aiff.Marker{aiff.Marker{
-					ID:       1,
-					Position: wave.RawWave.Loop.Start,
-					Name:     "start",
-				}, aiff.Marker{
-					ID:       2,
-					Position: wave.RawWave.Loop.End,
-					Name:     "end",
-				},
-				}}
-
-			aiffFile.Instrument = &aiff.InstrumentChunk{
-				BaseNote:     0,
-				Detune:       0,
-				LowNote:      0,
-				HighNote:     0,
-				LowVelocity:  0,
-				HighVelocity: 0,
-				Gain:         0,
-				SustainLoop:  aiff.Loop{PlayMode: 1, BeginLoop: 1, EndLoop: 2},
-				ReleaseLoop:  aiff.Loop{PlayMode: 0, BeginLoop: 0, EndLoop: 0},
-			}
-		}
-	}
-
-	aiffFile.SoundData = &aiff.SoundDataChunk{
-		Offset:       0,
-		BlockSize:    0,
-		WaveformData: data,
-	}
-
-	if _, err := os.Stat(filepath.Join(state.cwd, "sounds")); os.IsNotExist(err) {
-		os.Mkdir(filepath.Join(state.cwd, "sounds"), 0776)
-	}
-
-	aiffFileOut, err := os.OpenFile(filepath.Join(state.cwd, name), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
-
-	if err != nil {
+		var name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".aiff")
+		var err = writeAiff(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
 		return name, err
 	}
-
-	defer aiffFileOut.Close()
-
-	aiffFile.Serialize(aiffFileOut)
-
-	return name, nil
 }
 
 func writeKeyMap(state *insConversionState, source interface{}, output *os.File) (string, error) {
@@ -400,7 +141,7 @@ func writeSound(state *insConversionState, source interface{}, output *os.File) 
 	return name, err
 }
 
-func writeInstrument(state *insConversionState, source interface{}, output *os.File) (string, error) {
+func writeInstInstrument(state *insConversionState, source interface{}, output *os.File) (string, error) {
 	var name = state.getUniqueName("")
 
 	inst, ok := source.(*al64.ALInstrument)
@@ -479,7 +220,7 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 	state.sampleRate = alBank.SampleRate
 
 	if alBank.Percussion != nil {
-		_, err := state.writeSection(alBank.Percussion, output, "Percussion", writeInstrument)
+		_, err := state.writeSection(alBank.Percussion, output, "Percussion", writeInstInstrument)
 
 		if err != nil {
 			return name, err
@@ -488,7 +229,7 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 
 	for index, instrument := range alBank.InstArray {
 		if instrument != nil {
-			_, err := state.writeSection(instrument, output, MIDINames[index], writeInstrument)
+			_, err := state.writeSection(instrument, output, MIDINames[index], writeInstInstrument)
 
 			if err != nil {
 				return name, err
@@ -503,7 +244,7 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 	}
 
 	if alBank.Percussion != nil {
-		percussionName, _ := state.writeSection(alBank.Percussion, output, "Percussion", writeInstrument)
+		percussionName, _ := state.writeSection(alBank.Percussion, output, "Percussion", writeInstInstrument)
 
 		_, err = output.WriteString(fmt.Sprintf("    percussionDefault = %s;\n", percussionName))
 
@@ -514,7 +255,7 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 
 	for index, instrument := range alBank.InstArray {
 		if instrument != nil {
-			instrumentName, _ := state.writeSection(instrument, output, MIDINames[index], writeInstrument)
+			instrumentName, _ := state.writeSection(instrument, output, MIDINames[index], writeInstInstrument)
 
 			_, err = output.WriteString(fmt.Sprintf("    program [%d] = %s;\n", index, instrumentName))
 
