@@ -110,6 +110,57 @@ func sfzParseKeyMap(region *sfz.SfzFullRegion) (*al64.ALKeyMap, error) {
 	return &keyMap, nil
 }
 
+func sfzParseEnvelope(region *sfz.SfzFullRegion) (*al64.ALEnvelope, error) {
+	attack := region.FindValue("ampeg_attack")
+	decay := region.FindValue("ampeg_decay")
+	release := region.FindValue("ampeg_release")
+	sustainLevel := region.FindValue("ampeg_sustain")
+
+	if attack == "" && decay == "" && release == "" && sustainLevel == "" {
+		return nil, nil
+	}
+
+	var result al64.ALEnvelope
+
+	result.AttackVolume = 127
+
+	attackTime, err := strconv.ParseFloat(attack, 64)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result.AttackTime = int32(attackTime * 1000000)
+
+	decayTime, err := strconv.ParseFloat(decay, 64)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result.DecayTime = int32(decayTime * 1000000)
+
+	releaseTime, err := strconv.ParseFloat(release, 64)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result.ReleaseTime = int32(releaseTime * 1000000)
+
+	decayVolume, err := strconv.ParseFloat(decay, 64)
+
+	if decayVolume >= 100 {
+		result.DecayVolume = 127
+	} else if decayVolume < 0 {
+		result.DecayVolume = 0
+	} else {
+		result.DecayVolume = uint8(decayVolume / 100 * 127)
+	}
+
+	return &result, nil
+}
+
 func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 	var result al64.ALSound
 
@@ -120,6 +171,14 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 	}
 
 	result.KeyMap = keyMap
+
+	env, err := sfzParseEnvelope(region)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result.Envelope = env
 
 	return &result, nil
 }

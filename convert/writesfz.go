@@ -56,7 +56,7 @@ func writeSfzEnvelope(envelope *al64.ALEnvelope, output *os.File) error {
 		output.WriteString(fmt.Sprintf("ampeg_decay=%.06f\n", float64(envelope.DecayTime)/1000000))
 		output.WriteString(fmt.Sprintf("ampeg_release=%.06f\n", float64(envelope.ReleaseTime)/1000000))
 		if envelope.AttackVolume != 0 {
-			output.WriteString(fmt.Sprintf("ampeg_sustain=%.06f\n", float64(envelope.DecayVolume)/float64(envelope.AttackVolume)))
+			output.WriteString(fmt.Sprintf("ampeg_sustain=%.06f\n", 100*float64(envelope.DecayVolume)/float64(envelope.AttackVolume)))
 		}
 	}
 	return nil
