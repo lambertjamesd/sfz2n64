@@ -404,7 +404,8 @@ func (bank *ALBank) generateLayout(state *alSerializeState) {
 
 // ALBankFile
 func (bankFile *ALBankFile) serializeWrite(state *alSerializeState, target io.Writer) error {
-	err := binary.Write(target, binary.BigEndian, &bankFile.Revision)
+	var revision int16 = BANK_REVISION
+	err := binary.Write(target, binary.BigEndian, &revision)
 
 	if err != nil {
 		return err

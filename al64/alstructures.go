@@ -103,7 +103,7 @@ type ALBank struct {
 }
 
 type ALBankFile struct {
-	Revision int16
+	// Revision int16
 	// BankCount int16
 	BankArray []*ALBank
 }

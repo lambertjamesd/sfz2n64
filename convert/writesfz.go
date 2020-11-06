@@ -26,12 +26,7 @@ func writeSfzWavetable(state *insConversionState, source interface{}, output *os
 
 func writeSfzKeyMap(keymap *al64.ALKeyMap, output *os.File) error {
 	var finalBase = keymap.KeyBase
-	var detune = int(keymap.Detune)
-
-	if detune > 100 {
-		detune = detune - 200
-		finalBase = finalBase - 1
-	}
+	var detune = int8(keymap.Detune)
 
 	output.WriteString(fmt.Sprintf(
 		"lokey=%d hikey=%d pitch_keycenter=%d\n",
@@ -48,7 +43,7 @@ func writeSfzKeyMap(keymap *al64.ALKeyMap, output *os.File) error {
 
 	if detune != 0 {
 		output.WriteString(fmt.Sprintf(
-			"tune=%d\n", detune,
+			"tune=%d\n", int(detune),
 		))
 	}
 
@@ -94,12 +89,6 @@ func writeSfzInstrument(state *insConversionState, source interface{}, output *o
 	}
 
 	defer instFile.Close()
-
-	instFile.WriteString("\n<group>\n")
-
-	if inst.TremType != 0 {
-
-	}
 
 	for _, sound := range inst.SoundArray {
 		instFile.WriteString("\n<region>\n")

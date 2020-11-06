@@ -382,13 +382,14 @@ func readBank(state *alParseState, reader SeekableReader, address int32) (interf
 func readBankFile(state *alParseState, reader SeekableReader, address int32) (interface{}, error) {
 	var result ALBankFile
 
-	err := binary.Read(reader, binary.BigEndian, &result.Revision)
+	var revision int16
+	err := binary.Read(reader, binary.BigEndian, &revision)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if result.Revision != BANK_REVISION {
+	if revision != BANK_REVISION {
 		return nil, errors.New("Bad revision number")
 	}
 

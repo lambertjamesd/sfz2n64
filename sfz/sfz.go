@@ -16,6 +16,48 @@ type SfzSection struct {
 	ValuePairs []SfzValuePair
 }
 
+type SfzFullRegion struct {
+	Region *SfzSection
+	Group  *SfzSection
+	Global *SfzSection
+}
+
+func (section *SfzSection) FindValue(name string) string {
+	for _, pair := range section.ValuePairs {
+		if pair.Name == name {
+			return pair.Value
+		}
+	}
+
+	return ""
+}
+
+func (fullRegion *SfzFullRegion) FindValue(name string) string {
+	var result string
+
+	if fullRegion.Region != nil {
+		result = fullRegion.Region.FindValue(name)
+
+		if result != "" {
+			return result
+		}
+	}
+
+	if fullRegion.Group != nil {
+		result = fullRegion.Group.FindValue(name)
+
+		if result != "" {
+			return result
+		}
+	}
+
+	if fullRegion.Global != nil {
+		return fullRegion.Global.FindValue(name)
+	} else {
+		return ""
+	}
+}
+
 type SfzFile struct {
 	Sections []*SfzSection
 }
