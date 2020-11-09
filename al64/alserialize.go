@@ -446,3 +446,44 @@ func (bankFile *ALBankFile) Serialize(target io.Writer) error {
 	state.layoutSerializable(bankFile)
 	return state.writeOut(target)
 }
+
+type SoundArray struct {
+	Sounds []*ALSound
+}
+
+func (soundArray *SoundArray) serializeWrite(state *alSerializeState, target io.Writer) error {
+	var soundCount = uint32(len(soundArray.Sounds))
+	binary.Write(target, binary.BigEndian, &soundCount)
+
+	for _, sound := range soundArray.Sounds {
+		var soundOffset = state.getSerializableOffset(sound)
+		binary.Write(target, binary.BigEndian, &soundOffset)
+	}
+
+	return nil
+}
+
+func (soundArray *SoundArray) sizeInBytes() int {
+	return 4 + 4*len(soundArray.Sounds)
+}
+
+func (soundArray *SoundArray) byteAlign() int {
+	return 4
+}
+
+func (soundArray *SoundArray) generateLayout(state *alSerializeState) {
+	for _, sound := range soundArray.Sounds {
+		state.layoutSerializable(sound)
+	}
+}
+
+func (soundArray *SoundArray) Serialize(target io.Writer) error {
+	var state alSerializeState = alSerializeState{
+		make(map[alSerializable]int),
+		nil,
+		0,
+	}
+
+	state.layoutSerializable(soundArray)
+	return state.writeOut(target)
+}

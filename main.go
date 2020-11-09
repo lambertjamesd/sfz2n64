@@ -97,6 +97,14 @@ func main() {
 		} else {
 			log.Println("Not Compressed")
 		}
+	} else if ext == ".sounds" {
+		err := convert.WriteSoundBank(input, os.Args[2:len(os.Args)])
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Println("Wrote sound array to " + input)
 	} else {
 		log.Fatal(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file", input))
 	}
