@@ -284,7 +284,11 @@ func (envelope *ALEnvelope) generateLayout(state *alSerializeState) {
 func (sound *ALSound) serializeWrite(state *alSerializeState, target io.Writer) error {
 	var offset = state.getSerializableOffset(sound.Envelope)
 	binary.Write(target, binary.BigEndian, &offset)
-	offset = state.getSerializableOffset(sound.KeyMap)
+	if sound.KeyMap != nil {
+		offset = state.getSerializableOffset(sound.KeyMap)
+	} else {
+		offset = 0
+	}
 	binary.Write(target, binary.BigEndian, &offset)
 	offset = state.getSerializableOffset(sound.Wavetable)
 	binary.Write(target, binary.BigEndian, &offset)
@@ -309,7 +313,9 @@ func (sound *ALSound) byteAlign() int {
 
 func (sound *ALSound) generateLayout(state *alSerializeState) {
 	state.layoutSerializable(sound.Envelope)
-	state.layoutSerializable(sound.KeyMap)
+	if sound.KeyMap != nil {
+		state.layoutSerializable(sound.KeyMap)
+	}
 	state.layoutSerializable(sound.Wavetable)
 }
 
