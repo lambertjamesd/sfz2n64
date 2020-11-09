@@ -1,5 +1,7 @@
 package adpcm
 
+import "log"
+
 func innerProduct(length int, v1 []int32, v2 [16]int32) int32 {
 	var out int32 = 0
 	for i := 0; i < length; i = i + 1 {
@@ -422,4 +424,92 @@ func DecodeADPCM(data *ADPCMEncodedData) *PCMEncodedData {
 	}
 
 	return &result
+}
+
+func EncodeADPCM(data *PCMEncodedData, codebook *Codebook, loop *Loop, truncate bool, minLoopLength int) *ADPCMEncodedData {
+	var result []Frame = nil
+	var state []int32 = make([]int32, 16)
+	var currentPos = 0
+
+	if loop != nil {
+		var nRepeats = 0
+		var newEnd = loop.End
+		for newEnd-loop.Start < minLoopLength {
+			nRepeats = nRepeats + 1
+			newEnd = newEnd + loop.End - loop.Start
+		}
+
+		for currentPos <= loop.Start {
+			if currentPos+16 > len(data.Samples) {
+				log.Fatal("Not enough samples in file\n")
+			}
+
+			var frame = encodeFrame(data.Samples[currentPos:currentPos+16], state, codebook)
+			result = append(result, *frame)
+			currentPos += 16
+		}
+
+		for j := 0; j < 16; j++ {
+			if state[j] >= 0x8000 {
+				state[j] = 0x7fff
+			}
+			if state[j] < -0x7fff {
+				state[j] = -0x7fff
+			}
+			loop.State[j] = int16(state[j])
+		}
+
+		loop.Count = -1
+		for nRepeats > 0 {
+			for ; currentPos+16 < loop.End; currentPos = currentPos + 16 {
+				if currentPos+16 <= len(data.Samples) {
+					var frame = encodeFrame(data.Samples[currentPos:currentPos+16], state, codebook)
+					result = append(result, *frame)
+				}
+			}
+
+			var left = loop.End - currentPos
+
+			var bufferStart = data.Samples[currentPos : currentPos+left]
+			var bufferLoop = data.Samples[loop.Start : loop.Start+16-left]
+
+			var frame = encodeFrame(append(bufferStart, bufferLoop...), state, codebook)
+			result = append(result, *frame)
+			currentPos = loop.Start - left + 16
+			nRepeats = nRepeats - 1
+		}
+		loop.End = newEnd
+	}
+
+	var nFrames = len(data.Samples)
+	if loop != nil && truncate && loop.End+16 < nFrames {
+		nFrames = loop.End + 16
+	}
+
+	for currentPos < nFrames {
+		var sampleCount int
+
+		if nFrames-currentPos < 16 {
+			sampleCount = nFrames - currentPos
+		} else {
+			sampleCount = 16
+		}
+
+		var frames = data.Samples[currentPos : currentPos+sampleCount]
+
+		if sampleCount < 16 {
+			frames = append(frames, make([]int16, 16-sampleCount)...)
+		}
+
+		var frame = encodeFrame(frames, state, codebook)
+		result = append(result, *frame)
+	}
+
+	return &ADPCMEncodedData{
+		len(data.Samples),
+		0,
+		codebook,
+		loop,
+		result,
+	}
 }
