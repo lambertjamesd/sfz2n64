@@ -3,6 +3,7 @@ package convert
 import (
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 
@@ -161,6 +162,10 @@ func sfzParseEnvelope(region *sfz.SfzFullRegion) (*al64.ALEnvelope, error) {
 	return &result, nil
 }
 
+func sfzParseWavetable(region *sfz.SfzFullRegion) (*al64.ALWavetable, error) {
+	return nil, nil
+}
+
 func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 	var result al64.ALSound
 
@@ -179,6 +184,53 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 	}
 
 	result.Envelope = env
+
+	wavetable, err := sfzParseWavetable(region)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result.Wavetable = wavetable
+
+	pan := region.FindValue("pan")
+
+	if pan == "" {
+		result.SamplePan = 64
+	} else {
+		panAsFloat, err := strconv.ParseFloat(pan, 64)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if panAsFloat > 100 {
+			result.SamplePan = 127
+		} else if panAsFloat < -100 {
+			result.SamplePan = 0
+		} else {
+			result.SamplePan = uint8((panAsFloat + 100) * 127 / 200)
+		}
+	}
+
+	volume := region.FindValue("volume")
+
+	if volume == "" {
+		result.SampleVolume = 127
+	} else {
+		volumeAsFloat, err := strconv.ParseFloat(volume, 64)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if volumeAsFloat >= 0 {
+			result.SampleVolume = 127
+		} else {
+			var linearScale = math.Pow(1.071773463, volumeAsFloat)
+			result.SampleVolume = uint8(linearScale * 127)
+		}
+	}
 
 	return &result, nil
 }
@@ -210,6 +262,9 @@ func sfzParseInstrument(filename string) (*al64.ALInstrument, error) {
 			instrument.SoundArray = append(instrument.SoundArray, sound)
 		}
 	}
+
+	instrument.Volume = 127
+	instrument.Pan = 64
 
 	return &instrument, nil
 }
