@@ -209,6 +209,8 @@ func (waveTable *ALWavetable) serializeWrite(state *alSerializeState, target io.
 			offset = 0
 		}
 		binary.Write(target, binary.BigEndian, &offset)
+		offset = 0
+		binary.Write(target, binary.BigEndian, &offset)
 	}
 
 	return nil
@@ -269,7 +271,7 @@ func (envelope *ALEnvelope) serializeWrite(state *alSerializeState, target io.Wr
 }
 
 func (envelope *ALEnvelope) sizeInBytes() int {
-	return 12
+	return 14
 }
 
 func (envelope *ALEnvelope) byteAlign() int {
