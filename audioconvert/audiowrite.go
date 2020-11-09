@@ -1,4 +1,4 @@
-package convert
+package audioconvert
 
 import (
 	"bytes"
@@ -12,11 +12,11 @@ import (
 	"github.com/lambertjamesd/sfz2n64/wav"
 )
 
-func ensureDirectory(filename string) error {
+func EnsureDirectory(filename string) error {
 	var dir = filepath.Dir(filename)
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = ensureDirectory(dir)
+		err = EnsureDirectory(dir)
 		if err != nil {
 			return nil
 		}
@@ -60,10 +60,10 @@ func convertLoop(alType *al64.ALADPCMloop) *adpcm.Loop {
 		return nil
 	} else {
 		return &adpcm.Loop{
-			int(alType.Start),
-			int(alType.End),
-			int(alType.Count),
-			alType.State,
+			Start: int(alType.Start),
+			End:   int(alType.End),
+			Count: int(alType.Count),
+			State: alType.State,
 		}
 	}
 }
@@ -78,13 +78,13 @@ func encodeSamples(data []int16, order binary.ByteOrder) []byte {
 	return buffer.Bytes()
 }
 
-func swapEndian(data []byte) {
+func SwapEndian(data []byte) {
 	for i := 0; i < len(data); i = i + 2 {
 		data[i], data[i+1] = data[i+1], data[i]
 	}
 }
 
-func writeWav(filename string, wave *al64.ALWavetable, data []byte, sampleRate uint32) error {
+func WriteWav(filename string, wave *al64.ALWavetable, data []byte, sampleRate uint32) error {
 	var waveFile wav.Wave
 
 	if wave.Type == al64.AL_ADPCM_WAVE {
@@ -100,7 +100,7 @@ func writeWav(filename string, wave *al64.ALWavetable, data []byte, sampleRate u
 		data = encodeSamples(frames.Samples, binary.LittleEndian)
 		wave.Type = al64.AL_RAW16_WAVE
 	} else {
-		swapEndian(data)
+		SwapEndian(data)
 	}
 
 	waveFile.Header.Format = wav.FORMAT_PCM
@@ -112,7 +112,7 @@ func writeWav(filename string, wave *al64.ALWavetable, data []byte, sampleRate u
 
 	waveFile.Data = data
 
-	ensureDirectory(filename)
+	EnsureDirectory(filename)
 
 	waveFileOut, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 
@@ -127,7 +127,7 @@ func writeWav(filename string, wave *al64.ALWavetable, data []byte, sampleRate u
 	return nil
 }
 
-func writeAiff(filename string, wave *al64.ALWavetable, data []byte, sampleRate uint32) error {
+func WriteAiff(filename string, wave *al64.ALWavetable, data []byte, sampleRate uint32) error {
 	var aiffFile aiff.Aiff
 
 	if wave.Type == al64.AL_ADPCM_WAVE {
@@ -187,7 +187,7 @@ func writeAiff(filename string, wave *al64.ALWavetable, data []byte, sampleRate 
 		WaveformData: data,
 	}
 
-	ensureDirectory(filename)
+	EnsureDirectory(filename)
 
 	aiffFileOut, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 
@@ -202,7 +202,7 @@ func writeAiff(filename string, wave *al64.ALWavetable, data []byte, sampleRate 
 	return nil
 }
 
-func writeAifc(filename string, wave *al64.ALWavetable, data []byte, sampleRate uint32) error {
+func WriteAifc(filename string, wave *al64.ALWavetable, data []byte, sampleRate uint32) error {
 	var aiffFile aiff.Aiff
 
 	if wave.Type == al64.AL_RAW16_WAVE {
@@ -275,7 +275,7 @@ func writeAifc(filename string, wave *al64.ALWavetable, data []byte, sampleRate 
 		WaveformData: data,
 	}
 
-	ensureDirectory(filename)
+	EnsureDirectory(filename)
 
 	aiffFileOut, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 

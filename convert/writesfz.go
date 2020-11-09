@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/lambertjamesd/sfz2n64/al64"
+	"github.com/lambertjamesd/sfz2n64/audioconvert"
 )
 
 func writeSfzWavetable(state *insConversionState, source interface{}, output *os.File) (string, error) {
@@ -20,7 +21,7 @@ func writeSfzWavetable(state *insConversionState, source interface{}, output *os
 	var data = state.tblData[wave.Base : wave.Base+wave.Len]
 
 	var name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".wav")
-	var err = writeWav(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
+	var err = audioconvert.WriteWav(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
 	return name, err
 }
 
@@ -80,7 +81,7 @@ func writeSfzInstrument(state *insConversionState, source interface{}, output *o
 
 	var filename = filepath.Join(state.cwd, name)
 
-	ensureDirectory(filename)
+	audioconvert.EnsureDirectory(filename)
 
 	instFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 

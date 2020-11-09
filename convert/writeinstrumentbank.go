@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/lambertjamesd/sfz2n64/al64"
+	"github.com/lambertjamesd/sfz2n64/audioconvert"
 )
 
 func writeWavetable(state *insConversionState, source interface{}, output *os.File) (string, error) {
@@ -20,14 +21,14 @@ func writeWavetable(state *insConversionState, source interface{}, output *os.Fi
 
 	if wave.Type == al64.AL_ADPCM_WAVE {
 		var name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".aifc")
-		var err = writeAifc(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
+		var err = audioconvert.WriteAifc(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
 
-		err = writeWav(filepath.Join(state.cwd, name[0:len(name)-4]+"wav"), wave, data, state.sampleRate)
+		err = audioconvert.WriteWav(filepath.Join(state.cwd, name[0:len(name)-4]+"wav"), wave, data, state.sampleRate)
 
 		return name, err
 	} else {
 		var name = "." + string(filepath.Separator) + "sounds" + string(filepath.Separator) + state.getUniqueName(".aiff")
-		var err = writeAiff(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
+		var err = audioconvert.WriteAiff(filepath.Join(state.cwd, name), wave, data, state.sampleRate)
 		return name, err
 	}
 }
