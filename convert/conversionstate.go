@@ -15,6 +15,7 @@ type insConversionState struct {
 	alreadyWritten  map[interface{}]string
 	tblData         []byte
 	instrumentNames []string
+	skipBank        bool
 }
 
 func (state *insConversionState) getInstrumentName(index int) string {

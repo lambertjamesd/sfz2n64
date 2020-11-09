@@ -53,7 +53,7 @@ func main() {
 				instrumentNames = append(instrumentNames, instName[0:len(instName)-len(ext)])
 			}
 
-			err = convert.WriteInsFile(bankFile, tblData, output, instrumentNames)
+			err = convert.WriteInsFile(bankFile, tblData, output, instrumentNames, isSingle)
 		} else if outExt == ".ctl" {
 			err = convert.WriteSfzFile(bankFile, tblData, output)
 		} else {
@@ -85,7 +85,7 @@ func main() {
 		var outExt = filepath.Ext(output)
 
 		if outExt == ".inst" {
-			err = convert.WriteInsFile(bankFile, tblData, output, nil)
+			err = convert.WriteInsFile(bankFile, tblData, output, nil, false)
 		} else if outExt == ".sfz" {
 			err = convert.WriteSfzFile(bankFile, tblData, output)
 		} else {

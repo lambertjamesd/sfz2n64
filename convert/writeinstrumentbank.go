@@ -238,37 +238,41 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 		}
 	}
 
-	_, err := output.WriteString(fmt.Sprintf("\nbank %s\n{\n    sampleRate = %d;\n", name, alBank.SampleRate))
-
-	if err != nil {
-		return name, err
-	}
-
-	if alBank.Percussion != nil {
-		percussionName, _ := state.writeSection(alBank.Percussion, output, "Percussion", writeInstInstrument)
-
-		_, err = output.WriteString(fmt.Sprintf("    percussionDefault = %s;\n", percussionName))
+	if !state.skipBank {
+		_, err := output.WriteString(fmt.Sprintf("\nbank %s\n{\n    sampleRate = %d;\n", name, alBank.SampleRate))
 
 		if err != nil {
 			return name, err
 		}
-	}
 
-	for index, instrument := range alBank.InstArray {
-		if instrument != nil {
-			instrumentName, _ := state.writeSection(instrument, output, state.getInstrumentName(index), writeInstInstrument)
+		if alBank.Percussion != nil {
+			percussionName, _ := state.writeSection(alBank.Percussion, output, "Percussion", writeInstInstrument)
 
-			_, err = output.WriteString(fmt.Sprintf("    program [%d] = %s;\n", index, instrumentName))
+			_, err = output.WriteString(fmt.Sprintf("    percussionDefault = %s;\n", percussionName))
 
 			if err != nil {
 				return name, err
 			}
 		}
+
+		for index, instrument := range alBank.InstArray {
+			if instrument != nil {
+				instrumentName, _ := state.writeSection(instrument, output, state.getInstrumentName(index), writeInstInstrument)
+
+				_, err = output.WriteString(fmt.Sprintf("    program [%d] = %s;\n", index, instrumentName))
+
+				if err != nil {
+					return name, err
+				}
+			}
+		}
+
+		_, err = output.WriteString("}\n")
+
+		return name, err
 	}
 
-	_, err = output.WriteString("}\n")
-
-	return name, err
+	return name, nil
 }
 
 func writeALBankFile(state *insConversionState, source interface{}, output *os.File) (string, error) {
@@ -289,10 +293,11 @@ func writeALBankFile(state *insConversionState, source interface{}, output *os.F
 	return "", nil
 }
 
-func WriteInsFile(albank *al64.ALBankFile, tblData []byte, filename string, instrumentNames []string) error {
+func WriteInsFile(albank *al64.ALBankFile, tblData []byte, filename string, instrumentNames []string, skipBank bool) error {
 	var state insConversionState
 
 	state.instrumentNames = instrumentNames
+	state.skipBank = skipBank
 
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
 

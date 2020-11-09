@@ -58,13 +58,15 @@ func sfzParseKeyMap(region *sfz.SfzFullRegion) (*al64.ALKeyMap, error) {
 	hikey := region.FindValue("hikey")
 
 	if key != "" || lokey != "" || hikey != "" {
-		velocityMin, velocityMax, err := sfzParseRange(key, lokey, hikey)
+		keyMin, keyMax, err := sfzParseRange(key, lokey, hikey)
 
 		if err != nil {
 			return nil, err
 		}
 
-		keyMap.KeyMin, keyMap.KeyMax = velocityMin, velocityMax
+		keyMap.KeyMin, keyMap.KeyMax = keyMin, keyMax
+	} else {
+		keyMap.KeyMin, keyMap.KeyMax = 0, 127
 	}
 
 	vel := region.FindValue("vel")
@@ -79,6 +81,8 @@ func sfzParseKeyMap(region *sfz.SfzFullRegion) (*al64.ALKeyMap, error) {
 		}
 
 		keyMap.VelocityMin, keyMap.VelocityMax = velocityMin, velocityMax
+	} else {
+		keyMap.VelocityMin, keyMap.VelocityMax = 0, 127
 	}
 
 	pitch_keycenter := region.FindValue("pitch_keycenter")
