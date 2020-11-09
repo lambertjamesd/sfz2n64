@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/lambertjamesd/sfz2n64/al64"
+	"github.com/lambertjamesd/sfz2n64/audioconvert"
 	"github.com/lambertjamesd/sfz2n64/sfz"
 )
 
@@ -162,12 +163,14 @@ func sfzParseEnvelope(region *sfz.SfzFullRegion) (*al64.ALEnvelope, error) {
 	return &result, nil
 }
 
-func sfzParseWavetable(region *sfz.SfzFullRegion) (*al64.ALWavetable, error) {
-	return nil, nil
-}
-
 func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
-	var result al64.ALSound
+	filename := region.FindValue("sample")
+
+	if filename == "" {
+		return nil, errors.New("Region missing sample")
+	}
+
+	result, err := audioconvert.ReadWavetable(filename)
 
 	keyMap, err := sfzParseKeyMap(region)
 
@@ -184,14 +187,6 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 	}
 
 	result.Envelope = env
-
-	wavetable, err := sfzParseWavetable(region)
-
-	if err != nil {
-		return nil, err
-	}
-
-	result.Wavetable = wavetable
 
 	pan := region.FindValue("pan")
 
@@ -232,7 +227,7 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 		}
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 func sfzParseInstrument(filename string) (*al64.ALInstrument, error) {

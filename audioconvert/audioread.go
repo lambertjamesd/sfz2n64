@@ -11,11 +11,11 @@ import (
 	"github.com/lambertjamesd/sfz2n64/wav"
 )
 
-func wavToSoundEntry(filename string) (*al64.ALSound, []byte, error) {
+func wavToSoundEntry(filename string) (*al64.ALSound, error) {
 	file, err := os.Open(filename)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	defer file.Close()
@@ -23,19 +23,19 @@ func wavToSoundEntry(filename string) (*al64.ALSound, []byte, error) {
 	waveFile, err := wav.Parse(file)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if waveFile.Header.Format != wav.FORMAT_PCM {
-		return nil, nil, errors.New(fmt.Sprintf("%s should be pcm", filename))
+		return nil, errors.New(fmt.Sprintf("%s should be pcm", filename))
 	}
 
 	if waveFile.Header.NChannels != 1 {
-		return nil, nil, errors.New(fmt.Sprintf("%s should have 1 channel", filename))
+		return nil, errors.New(fmt.Sprintf("%s should have 1 channel", filename))
 	}
 
 	if waveFile.Header.BitsPerSample != 16 {
-		return nil, nil, errors.New(fmt.Sprintf("%s should have 16 bits per sample", filename))
+		return nil, errors.New(fmt.Sprintf("%s should have 16 bits per sample", filename))
 	}
 
 	SwapEndian(waveFile.Data)
@@ -58,14 +58,16 @@ func wavToSoundEntry(filename string) (*al64.ALSound, []byte, error) {
 		RawWave:  al64.ALRAWWaveInfo{Loop: nil},
 	}
 
-	return &result, waveFile.Data, nil
+	result.Wavetable.DataFromTable = waveFile.Data
+
+	return &result, nil
 }
 
-func aiffToSoundEntry(filename string) (*al64.ALSound, []byte, error) {
+func aiffToSoundEntry(filename string) (*al64.ALSound, error) {
 	file, err := os.Open(filename)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	defer file.Close()
@@ -73,15 +75,15 @@ func aiffToSoundEntry(filename string) (*al64.ALSound, []byte, error) {
 	aiffFile, err := aiff.Parse(file)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if aiffFile.Common.NumChannels != 1 {
-		return nil, nil, errors.New(fmt.Sprintf("%s should have 1 channel", filename))
+		return nil, errors.New(fmt.Sprintf("%s should have 1 channel", filename))
 	}
 
 	if aiffFile.Common.SampleSize != 16 {
-		return nil, nil, errors.New(fmt.Sprintf("%s should have 16 bits per sample", filename))
+		return nil, errors.New(fmt.Sprintf("%s should have 16 bits per sample", filename))
 	}
 
 	var result al64.ALSound
@@ -99,10 +101,12 @@ func aiffToSoundEntry(filename string) (*al64.ALSound, []byte, error) {
 		// TODO loops
 	}
 
-	return &result, aiffFile.SoundData.WaveformData, nil
+	result.Wavetable.DataFromTable = aiffFile.SoundData.WaveformData
+
+	return &result, nil
 }
 
-func ReadWavetable(filename string) (*al64.ALSound, []byte, error) {
+func ReadWavetable(filename string) (*al64.ALSound, error) {
 	var ext = filepath.Ext(filename)
 
 	if ext == ".wav" {
@@ -110,7 +114,7 @@ func ReadWavetable(filename string) (*al64.ALSound, []byte, error) {
 	} else if ext == ".aiff" || ext == ".aifc" {
 		return aiffToSoundEntry(filename)
 	} else {
-		return nil, nil, errors.New("Not a supported sound file " + filename)
+		return nil, errors.New("Not a supported sound file " + filename)
 	}
 
 }

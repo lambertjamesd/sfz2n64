@@ -7,29 +7,11 @@ import (
 	"github.com/lambertjamesd/sfz2n64/audioconvert"
 )
 
-type SoundEntry struct {
-	sound     *al64.ALSound
-	soundData []byte
-}
-
-func fileToSoundEntry(filename string) (*SoundEntry, error) {
-	result, soundData, err := audioconvert.ReadWavetable(filename)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &SoundEntry{
-		result,
-		soundData,
-	}, nil
-}
-
 func WriteSoundBank(outputName string, inputSounds []string) error {
-	var sounds []*SoundEntry
+	var sounds []*al64.ALSound
 
 	for _, input := range inputSounds {
-		sound, err := fileToSoundEntry(input)
+		sound, err := audioconvert.ReadWavetable(input)
 
 		if err != nil {
 			return err
@@ -43,10 +25,10 @@ func WriteSoundBank(outputName string, inputSounds []string) error {
 	var soundData al64.SoundArray = al64.SoundArray{Sounds: nil}
 
 	for _, sound := range sounds {
-		sound.sound.Wavetable.Base = sound.sound.Wavetable.Base + offset
-		offset = offset + int32(len(sound.soundData))
-		soundData.Sounds = append(soundData.Sounds, sound.sound)
-		combinedData = append(combinedData, sound.soundData...)
+		sound.Wavetable.Base = sound.Wavetable.Base + offset
+		offset = offset + int32(len(sound.Wavetable.DataFromTable))
+		soundData.Sounds = append(soundData.Sounds, sound)
+		combinedData = append(combinedData, sound.Wavetable.DataFromTable...)
 	}
 
 	outFile, err := os.OpenFile(outputName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)

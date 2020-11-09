@@ -47,6 +47,10 @@ type ALWavetable struct {
 	// Flags    uint8
 	AdpcWave ALADPCMWaveInfo
 	RawWave  ALRAWWaveInfo
+	// this parameter is not actually part of the n64 data structure
+	// but is used to make it easier to pass ALWavetable with it's
+	// cooresponding data
+	DataFromTable []byte
 }
 
 type ALKeyMap struct {
