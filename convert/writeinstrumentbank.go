@@ -230,7 +230,7 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 
 	for index, instrument := range alBank.InstArray {
 		if instrument != nil {
-			_, err := state.writeSection(instrument, output, MIDINames[index], writeInstInstrument)
+			_, err := state.writeSection(instrument, output, state.getInstrumentName(index), writeInstInstrument)
 
 			if err != nil {
 				return name, err
@@ -256,7 +256,7 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 
 	for index, instrument := range alBank.InstArray {
 		if instrument != nil {
-			instrumentName, _ := state.writeSection(instrument, output, MIDINames[index], writeInstInstrument)
+			instrumentName, _ := state.writeSection(instrument, output, state.getInstrumentName(index), writeInstInstrument)
 
 			_, err = output.WriteString(fmt.Sprintf("    program [%d] = %s;\n", index, instrumentName))
 
@@ -289,8 +289,10 @@ func writeALBankFile(state *insConversionState, source interface{}, output *os.F
 	return "", nil
 }
 
-func WriteInsFile(albank *al64.ALBankFile, tblData []byte, filename string) error {
+func WriteInsFile(albank *al64.ALBankFile, tblData []byte, filename string, instrumentNames []string) error {
 	var state insConversionState
+
+	state.instrumentNames = instrumentNames
 
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
 

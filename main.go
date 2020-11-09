@@ -9,6 +9,7 @@ import (
 
 	"github.com/lambertjamesd/sfz2n64/aiff"
 	"github.com/lambertjamesd/sfz2n64/al64"
+	"github.com/lambertjamesd/sfz2n64/audioconvert"
 	"github.com/lambertjamesd/sfz2n64/convert"
 	"github.com/lambertjamesd/sfz2n64/sfz"
 )
@@ -30,7 +31,36 @@ func main() {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("Parsed %s with %d sections", input, len(sfzFile.Sections))
+		bankFile, err := convert.Sfz2N64(sfzFile, input)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var outExt = filepath.Ext(output)
+
+		var tblData = audioconvert.BuildTbl(bankFile)
+
+		var isSingle = convert.SfzIsSingleInstrument(sfzFile)
+
+		if outExt == ".inst" {
+			var instrumentNames []string = nil
+
+			if isSingle {
+				var instName = filepath.Base(input)
+				var ext = filepath.Ext(instName)
+
+				instrumentNames = append(instrumentNames, instName[0:len(instName)-len(ext)])
+			}
+
+			err = convert.WriteInsFile(bankFile, tblData, output, instrumentNames)
+		} else if outExt == ".ctl" {
+			err = convert.WriteSfzFile(bankFile, tblData, output)
+		} else {
+			log.Fatal("Outut file should be of type .inst or .sfz")
+		}
+
+		fmt.Printf("Wrote instrument file to %s", output)
 	} else if ext == ".ctl" {
 		file, err := os.Open(input)
 
@@ -55,7 +85,7 @@ func main() {
 		var outExt = filepath.Ext(output)
 
 		if outExt == ".inst" {
-			err = convert.WriteInsFile(bankFile, tblData, output)
+			err = convert.WriteInsFile(bankFile, tblData, output, nil)
 		} else if outExt == ".sfz" {
 			err = convert.WriteSfzFile(bankFile, tblData, output)
 		} else {

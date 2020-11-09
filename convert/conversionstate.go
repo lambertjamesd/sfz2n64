@@ -8,12 +8,21 @@ import (
 type writeIntoIns func(state *insConversionState, source interface{}, output *os.File) (string, error)
 
 type insConversionState struct {
-	cwd            string
-	nameHint       string
-	sampleRate     uint32
-	usedNames      map[string]bool
-	alreadyWritten map[interface{}]string
-	tblData        []byte
+	cwd             string
+	nameHint        string
+	sampleRate      uint32
+	usedNames       map[string]bool
+	alreadyWritten  map[interface{}]string
+	tblData         []byte
+	instrumentNames []string
+}
+
+func (state *insConversionState) getInstrumentName(index int) string {
+	if index < len(state.instrumentNames) {
+		return state.instrumentNames[index]
+	} else {
+		return MIDINames[index]
+	}
 }
 
 func fixName(name string) string {

@@ -50,7 +50,8 @@ type ALWavetable struct {
 	// this parameter is not actually part of the n64 data structure
 	// but is used to make it easier to pass ALWavetable with it's
 	// cooresponding data
-	DataFromTable []byte
+	DataFromTable  []byte
+	FileSampleRate uint32
 }
 
 type ALKeyMap struct {

@@ -163,6 +163,49 @@ func sfzParseEnvelope(region *sfz.SfzFullRegion) (*al64.ALEnvelope, error) {
 	return &result, nil
 }
 
+func sfzParseLoop(region *sfz.SfzFullRegion, sound *al64.ALSound) error {
+	var loopMode = region.FindValue("loop_mode")
+	var loopStart = region.FindValue("loop_start")
+	var loopEnd = region.FindValue("loop_end")
+
+	if loopMode != "" || loopStart != "" || loopEnd != "" {
+		var start uint32
+		var end uint32
+
+		if loopStart == "" {
+			start = 0
+		} else {
+			start64, err := strconv.ParseInt(loopStart, 10, 32)
+
+			if err != nil {
+				return errors.New("Invalid value for loop_start")
+			}
+
+			start = uint32(start64)
+		}
+
+		if loopEnd == "" {
+			end = 0
+		} else {
+			end64, err := strconv.ParseInt(loopEnd, 10, 32)
+
+			if err != nil {
+				return errors.New("Invalid value for loop_end")
+			}
+
+			end = uint32(end64)
+		}
+
+		sound.Wavetable.RawWave.Loop = &al64.ALRawLoop{
+			Start: start,
+			End:   end,
+			Count: ^uint32(0),
+		}
+	}
+
+	return nil
+}
+
 func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 	filename := region.FindValue("sample")
 
@@ -227,17 +270,13 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 		}
 	}
 
+	sfzParseLoop(region, result)
+
 	return result, nil
 }
 
-func sfzParseInstrument(filename string) (*al64.ALInstrument, error) {
-	sfzFile, err := sfz.ParseSfz(filename)
-
-	if err != nil {
-		return nil, err
-	}
-
-	var fullRegion *sfz.SfzFullRegion
+func sfzParseInstrument(sfzFile *sfz.SfzFile) (*al64.ALInstrument, error) {
+	var fullRegion sfz.SfzFullRegion
 
 	var instrument al64.ALInstrument
 
@@ -248,7 +287,7 @@ func sfzParseInstrument(filename string) (*al64.ALInstrument, error) {
 			fullRegion.Group = section
 		} else if section.Name == "<region>" {
 			fullRegion.Region = section
-			sound, err := sfzParseSound(fullRegion)
+			sound, err := sfzParseSound(&fullRegion)
 
 			if err != nil {
 				return nil, err
@@ -264,33 +303,59 @@ func sfzParseInstrument(filename string) (*al64.ALInstrument, error) {
 	return &instrument, nil
 }
 
-func Sfz2N64(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFile, error) {
+func sfzParseInstrumentFile(filename string) (*al64.ALInstrument, error) {
+	sfzFile, err := sfz.ParseSfz(filename)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return sfzParseInstrument(sfzFile)
+}
+
+func SfzIsSingleInstrument(input *sfz.SfzFile) bool {
+	for _, section := range input.Sections {
+		if section.Name == "<bank>" || section.Name == "<percussion>" || section.Name == "<instrument>" {
+			return false
+		}
+	}
+	return true
+}
+
+func sfzParseAsBankFile(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFile, error) {
 	var result al64.ALBankFile
 	var currentBank *al64.ALBank
 
 	for _, section := range input.Sections {
 		if section.Name == "<bank>" {
 			currentBank = &al64.ALBank{SampleRate: 0, Percussion: nil, InstArray: nil}
+			result.BankArray = append(result.BankArray, currentBank)
 		} else if section.Name == "<percussion>" {
 			if currentBank == nil {
 				currentBank = &al64.ALBank{SampleRate: 0, Percussion: nil, InstArray: nil}
+				result.BankArray = append(result.BankArray, currentBank)
 			}
 			var instrumentName = section.FindValue("instrument")
 
 			if instrumentName != "" {
-				inst, err := sfzParseInstrument(filepath.Join(filepath.Dir(sfzFilename), instrumentName))
+				inst, err := sfzParseInstrumentFile(filepath.Join(filepath.Dir(sfzFilename), instrumentName))
 
 				if err != nil {
 					return nil, err
 				}
 
 				currentBank.Percussion = inst
+
+				if len(inst.SoundArray) > 0 {
+					currentBank.SampleRate = inst.SoundArray[0].Wavetable.FileSampleRate
+				}
 			} else {
 				return nil, errors.New("<percussion> section defined without an instrument")
 			}
 		} else if section.Name == "<instrument>" {
 			if currentBank == nil {
 				currentBank = &al64.ALBank{SampleRate: 0, Percussion: nil, InstArray: nil}
+				result.BankArray = append(result.BankArray, currentBank)
 			}
 
 			var programNumberAsString = section.FindValue("program_number")
@@ -320,15 +385,48 @@ func Sfz2N64(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFile, error) {
 				return nil, errors.New("<instrument> section defined without an instrument")
 			}
 
-			inst, err := sfzParseInstrument(filepath.Join(filepath.Dir(sfzFilename), instrumentName))
+			inst, err := sfzParseInstrumentFile(filepath.Join(filepath.Dir(sfzFilename), instrumentName))
 
 			if err != nil {
 				return nil, err
 			}
 
 			currentBank.InstArray[programNumber] = inst
+
+			if len(inst.SoundArray) > 0 {
+				currentBank.SampleRate = inst.SoundArray[0].Wavetable.FileSampleRate
+			}
 		}
 	}
 
 	return &result, nil
+}
+
+func sfzParseAsSingleInstrument(input *sfz.SfzFile) (*al64.ALBankFile, error) {
+	var result al64.ALBankFile
+	var currentBank *al64.ALBank
+	currentBank = &al64.ALBank{SampleRate: 0, Percussion: nil, InstArray: nil}
+	result.BankArray = append(result.BankArray, currentBank)
+	inst, err := sfzParseInstrument(input)
+
+	if err != nil {
+		return nil, err
+	}
+
+	currentBank.InstArray = make([]*al64.ALInstrument, 1)
+	currentBank.InstArray[0] = inst
+
+	if len(inst.SoundArray) > 0 {
+		currentBank.SampleRate = inst.SoundArray[0].Wavetable.FileSampleRate
+	}
+
+	return &result, nil
+}
+
+func Sfz2N64(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFile, error) {
+	if SfzIsSingleInstrument(input) {
+		return sfzParseAsSingleInstrument(input)
+	} else {
+		return sfzParseAsBankFile(input, sfzFilename)
+	}
 }

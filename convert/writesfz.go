@@ -167,7 +167,7 @@ func writeSfzBank(state *insConversionState, source interface{}, output *os.File
 
 	for index, instrument := range alBank.InstArray {
 		if instrument != nil {
-			percussionName, err := state.writeSection(instrument, output, MIDINames[index], writeSfzInstrument)
+			percussionName, err := state.writeSection(instrument, output, state.getInstrumentName(index), writeSfzInstrument)
 
 			if err != nil {
 				return name, err
