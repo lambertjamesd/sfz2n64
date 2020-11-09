@@ -1,3 +1,7 @@
 .vscode/
 
+build/*
+build.zip
+
 sfz2n64
+sfz2n64.exe

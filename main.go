@@ -16,7 +16,13 @@ import (
 
 func main() {
 	if len(os.Args) != 3 {
-		log.Fatal("Usage sfz2n64 input.sfz output_prefix")
+		log.Fatal(`Usage
+	sfz2n64 input.sfz output.inst
+	sfz2n64 input.sfz output.ctl
+
+	sfz2n64 input.ctl output.inst
+	sfz2n64 input.ctl output.sfz
+`)
 	}
 
 	var input = os.Args[1]
