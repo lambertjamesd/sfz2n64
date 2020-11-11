@@ -271,7 +271,231 @@ func kfroma(in []float64, out []float64, n int) int {
 	return ret
 }
 
-func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64) (*Codebook, error) {
+func rfroma(arg0 []float64, n int, arg2 []float64) {
+	var i, j int
+	var mat [][]float64
+	var div float64
+
+	mat = make([][]float64, n+1)
+	mat[n] = make([]float64, n+1)
+	mat[n][0] = 1.0
+	for i = 1; i <= n; i++ {
+		mat[n][i] = -arg0[i]
+	}
+
+	for i = n; i >= 1; i-- {
+		mat[i-1] = make([]float64, i)
+		div = 1.0 - mat[i][i]*mat[i][i]
+		for j = 1; j <= i-1; j++ {
+			mat[i-1][j] = (mat[i][i-j]*mat[i][i] + mat[i][j]) / div
+		}
+	}
+
+	arg2[0] = 1
+	for i = 1; i <= n; i++ {
+		arg2[i] = 0
+		for j = 1; j <= i; j++ {
+			arg2[i] += mat[i][j] * arg2[i-j]
+		}
+	}
+}
+
+func durbin(arg0 []float64, n int, arg2 []float64, arg3 []float64, outSomething *float64) int {
+	var i, j int
+	var sum, div float64
+	var ret int
+
+	arg3[0] = 1.0
+	div = arg0[0]
+	ret = 0
+
+	for i = 1; i <= n; i++ {
+		sum = 0.0
+		for j = 1; j <= i-1; j++ {
+			sum += arg3[j] * arg0[i-j]
+		}
+
+		if div > 0 {
+			arg3[i] = -(arg0[i] + sum) / div
+		} else {
+			arg3[i] = 0
+		}
+		arg2[i] = arg3[i]
+
+		if math.Abs(arg2[i]) > 1 {
+			ret++
+		}
+
+		for j = 1; j < i; j++ {
+			arg3[j] += arg3[i-j] * arg3[i]
+		}
+
+		div *= 1.0 - arg3[i]*arg3[i]
+	}
+	*outSomething = div
+	return ret
+}
+
+func split(table [][]float64, delta []float64, order int, npredictors int, scale float64) {
+	for i := 0; i < npredictors; i++ {
+		for j := 0; j <= order; j++ {
+			table[i+npredictors][j] = table[i][j] + delta[j]*scale
+		}
+	}
+}
+
+func modelDist(arg0 []float64, arg1 []float64, n int) float64 {
+	var ret float64
+
+	var sp3C = make([]float64, n+1)
+	var sp38 = make([]float64, n+1)
+
+	rfroma(arg1, n, sp3C)
+
+	for i := 0; i <= n; i++ {
+		sp38[i] = 0.0
+		for j := 0; j <= n-i; j++ {
+			sp38[i] += arg0[j] * arg0[i+j]
+		}
+	}
+
+	ret = sp38[0] * sp3C[0]
+	for i := 1; i <= n; i++ {
+		ret += 2 * sp3C[i] * sp38[i]
+	}
+	return ret
+}
+
+func refine(table [][]float64, order int, npredictors int, data [][]float64, dataSize int, refineIters int) {
+	var dist float64
+	var dummy float64 // spC0
+	var bestValue float64
+	var bestIndex int
+
+	var rsums = make([][]float64, npredictors)
+	for i := 0; i < npredictors; i++ {
+		rsums[i] = make([]float64, order+1)
+	}
+
+	var counts = make([]float64, npredictors)
+	var temp_s7 = make([]float64, order+1)
+
+	for iter := 0; iter < refineIters; iter++ {
+		for i := 0; i < npredictors; i++ {
+			counts[i] = 0
+			for j := 0; j <= order; j++ {
+				rsums[i][j] = 0.0
+			}
+		}
+
+		for i := 0; i < dataSize; i++ {
+			bestValue = 1e30
+			bestIndex = 0
+
+			for j := 0; j < npredictors; j++ {
+				dist = modelDist(table[j], data[i], order)
+				if dist < bestValue {
+					bestValue = dist
+					bestIndex = j
+				}
+			}
+
+			counts[bestIndex]++
+			rfroma(data[i], order, temp_s7)
+			for j := 0; j <= order; j++ {
+				rsums[bestIndex][j] += temp_s7[j]
+			}
+		}
+
+		for i := 0; i < npredictors; i++ {
+			if counts[i] > 0 {
+				for j := 0; j <= order; j++ {
+					rsums[i][j] /= counts[i]
+				}
+			}
+		}
+
+		for i := 0; i < npredictors; i++ {
+			durbin(rsums[i], order, temp_s7, table[i], &dummy)
+
+			for j := 1; j <= order; j++ {
+				if temp_s7[j] >= 1.0 {
+					temp_s7[j] = 0.9999999999
+				}
+				if temp_s7[j] <= -1.0 {
+					temp_s7[j] = -0.9999999999
+				}
+			}
+
+			afromk(temp_s7, table[i], order)
+		}
+	}
+}
+
+func buildPredictor(row []float64, order int) (Predictor, int) {
+	var result Predictor
+
+	for i := 0; i < PREDICTOR_SIZE; i++ {
+		result.Table[i] = make([]int32, order)
+	}
+
+	var table = make([][]float64, 8)
+
+	for i := 0; i < 8; i++ {
+		table[i] = make([]float64, order)
+	}
+
+	for i := 0; i < order; i++ {
+		for j := 0; j < i; j++ {
+			table[i][j] = 0.0
+		}
+
+		for j := i; j < order; j++ {
+			table[i][j] = -row[order-j+i]
+		}
+	}
+
+	for i := order; i < 8; i++ {
+		for j := 0; j < order; j++ {
+			table[i][j] = 0.0
+		}
+	}
+
+	for i := 1; i < 8; i++ {
+		for j := 1; j <= order; j++ {
+			if i-j >= 0 {
+				for k := 0; k < order; k++ {
+					table[i][k] -= row[j] * table[i-j][k]
+				}
+			}
+		}
+	}
+
+	var overflows = 0
+	for i := 0; i < order; i++ {
+		for j := 0; j < 8; j++ {
+			var fval = table[j][i] * 2048
+			var ival int32
+			if fval < 0.0 {
+				ival = int32(fval - 0.5)
+				if ival < -0x8000 {
+					overflows++
+				}
+			} else {
+				ival = int32(fval + 0.5)
+				if ival >= 0x8000 {
+					overflows++
+				}
+			}
+
+			result.Table[j][i] = ival
+		}
+	}
+
+	return result, overflows
+}
+
+func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64, bits int, refineIters int) (Codebook, error) {
 	var curr = 0
 	var vec = make([]float64, order+1)
 
@@ -318,5 +542,71 @@ func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64
 		}
 	}
 
-	return nil, nil
+	vec[0] = 1.0
+	for j := 1; j <= order; j++ {
+		vec[j] = 0.0
+	}
+
+	var temp_s1 [][]float64 = make([][]float64, 1<<bits)
+
+	for i := 0; i < (1 << bits); i++ {
+		temp_s1[i] = make([]float64, order+1)
+	}
+
+	for i := 0; i < dataSize; i++ {
+		rfroma(data[i], order, temp_s1[0])
+		for j := 1; j <= order; j++ {
+			vec[j] += temp_s1[0][j]
+		}
+	}
+
+	for j := 1; j <= order; j++ {
+		vec[j] = vec[j] / float64(dataSize)
+	}
+
+	var dummy float64
+	durbin(vec, order, spF4, temp_s1[0], &dummy)
+
+	for j := 1; j <= order; j++ {
+		if spF4[j] >= 1.0 {
+			spF4[j] = 0.9999999999
+		}
+
+		if spF4[j] <= -1.0 {
+			spF4[j] = -0.9999999999
+		}
+	}
+
+	afromk(spF4, temp_s1[0], order)
+	var curBits = 0
+	var splitDelta []float64 = make([]float64, order+1)
+	for curBits < bits {
+		for i := 0; i <= order; i++ {
+			splitDelta[i] = 0.0
+		}
+		splitDelta[order-1] = -1.0
+		split(temp_s1, splitDelta, order, 1<<curBits, 0.01)
+		curBits++
+		refine(temp_s1, order, 1<<curBits, data, dataSize, refineIters)
+	}
+
+	var npredictors = 1 << curBits
+	var numOverflows = 0
+
+	var result Codebook
+
+	result.Order = order
+
+	for i := 0; i < npredictors; i++ {
+		predector, overflows := buildPredictor(temp_s1[i], order)
+
+		numOverflows = numOverflows + overflows
+		result.Predictors = append(result.Predictors, predector)
+	}
+
+	if numOverflows > 0 {
+		return result, errors.New("There was overflow - check the table")
+	} else {
+		return result, nil
+	}
 }
