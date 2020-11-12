@@ -495,38 +495,46 @@ func buildPredictor(row []float64, order int) (Predictor, int) {
 	return result, overflows
 }
 
-func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64, bits int, refineIters int) (Codebook, error) {
+type CompressionSettings struct {
+	Order       int
+	FrameSize   int
+	Threshold   float64
+	Bits        int
+	RefineIters int
+}
+
+func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (Codebook, error) {
 	var curr = 0
-	var vec = make([]float64, order+1)
+	var vec = make([]float64, settings.Order+1)
 
-	var mat = make([][]float64, order+1)
+	var mat = make([][]float64, settings.Order+1)
 
-	var spF4 = make([]float64, order+1)
+	var spF4 = make([]float64, settings.Order+1)
 	var data = make([][]float64, len(pcmData))
 
-	for i := 0; i <= order; i = i + 1 {
-		mat[i] = make([]float64, order+1)
+	for i := 0; i <= settings.Order; i = i + 1 {
+		mat[i] = make([]float64, settings.Order+1)
 	}
 
 	var dataSize = 0
 
-	for ; curr < len(pcmData); curr = curr + frameSize {
-		var frame = readPcm(pcmData, curr, frameSize)
-		acVect(frame, order, frameSize, vec)
+	for ; curr < len(pcmData); curr = curr + settings.FrameSize {
+		var frame = readPcm(pcmData, curr, settings.FrameSize)
+		acVect(frame, settings.Order, settings.FrameSize, vec)
 
-		if math.Abs(vec[0]) > thresh {
-			acMat(frame, order, frameSize, mat)
+		if math.Abs(vec[0]) > settings.Threshold {
+			acMat(frame, settings.Order, settings.FrameSize, mat)
 
 			var permDet int
-			var perm = make([]int, order+1)
-			if luDecomp(mat, order, perm, &permDet) {
-				luDecompBackSub(mat, order, perm, vec)
+			var perm = make([]int, settings.Order+1)
+			if luDecomp(mat, settings.Order, perm, &permDet) {
+				luDecompBackSub(mat, settings.Order, perm, vec)
 				vec[0] = 1
-				if kfroma(vec, spF4, order) == 0 {
-					data[dataSize] = make([]float64, order+1)
+				if kfroma(vec, spF4, settings.Order) == 0 {
+					data[dataSize] = make([]float64, settings.Order+1)
 					data[dataSize][0] = 1.0
 
-					for i := 1; i <= order; i = i + 1 {
+					for i := 1; i <= settings.Order; i = i + 1 {
 						if spF4[i] >= 1 {
 							spF4[i] = 0.9999999999
 						}
@@ -535,7 +543,7 @@ func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64
 						}
 					}
 
-					afromk(spF4, data[dataSize], order)
+					afromk(spF4, data[dataSize], settings.Order)
 					dataSize = dataSize + 1
 				}
 			}
@@ -543,31 +551,31 @@ func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64
 	}
 
 	vec[0] = 1.0
-	for j := 1; j <= order; j++ {
+	for j := 1; j <= settings.Order; j++ {
 		vec[j] = 0.0
 	}
 
-	var temp_s1 [][]float64 = make([][]float64, 1<<bits)
+	var temp_s1 [][]float64 = make([][]float64, 1<<settings.Bits)
 
-	for i := 0; i < (1 << bits); i++ {
-		temp_s1[i] = make([]float64, order+1)
+	for i := 0; i < (1 << settings.Bits); i++ {
+		temp_s1[i] = make([]float64, settings.Order+1)
 	}
 
 	for i := 0; i < dataSize; i++ {
-		rfroma(data[i], order, temp_s1[0])
-		for j := 1; j <= order; j++ {
+		rfroma(data[i], settings.Order, temp_s1[0])
+		for j := 1; j <= settings.Order; j++ {
 			vec[j] += temp_s1[0][j]
 		}
 	}
 
-	for j := 1; j <= order; j++ {
+	for j := 1; j <= settings.Order; j++ {
 		vec[j] = vec[j] / float64(dataSize)
 	}
 
 	var dummy float64
-	durbin(vec, order, spF4, temp_s1[0], &dummy)
+	durbin(vec, settings.Order, spF4, temp_s1[0], &dummy)
 
-	for j := 1; j <= order; j++ {
+	for j := 1; j <= settings.Order; j++ {
 		if spF4[j] >= 1.0 {
 			spF4[j] = 0.9999999999
 		}
@@ -577,17 +585,17 @@ func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64
 		}
 	}
 
-	afromk(spF4, temp_s1[0], order)
+	afromk(spF4, temp_s1[0], settings.Order)
 	var curBits = 0
-	var splitDelta []float64 = make([]float64, order+1)
-	for curBits < bits {
-		for i := 0; i <= order; i++ {
+	var splitDelta []float64 = make([]float64, settings.Order+1)
+	for curBits < settings.Bits {
+		for i := 0; i <= settings.Order; i++ {
 			splitDelta[i] = 0.0
 		}
-		splitDelta[order-1] = -1.0
-		split(temp_s1, splitDelta, order, 1<<curBits, 0.01)
+		splitDelta[settings.Order-1] = -1.0
+		split(temp_s1, splitDelta, settings.Order, 1<<curBits, 0.01)
 		curBits++
-		refine(temp_s1, order, 1<<curBits, data, dataSize, refineIters)
+		refine(temp_s1, settings.Order, 1<<curBits, data, dataSize, settings.RefineIters)
 	}
 
 	var npredictors = 1 << curBits
@@ -595,10 +603,10 @@ func CalculateCodebook(pcmData []int16, order int, frameSize int, thresh float64
 
 	var result Codebook
 
-	result.Order = order
+	result.Order = settings.Order
 
 	for i := 0; i < npredictors; i++ {
-		predector, overflows := buildPredictor(temp_s1[i], order)
+		predector, overflows := buildPredictor(temp_s1[i], settings.Order)
 
 		numOverflows = numOverflows + overflows
 		result.Predictors = append(result.Predictors, predector)
