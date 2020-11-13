@@ -26,7 +26,7 @@ func EnsureDirectory(filename string) error {
 	return nil
 }
 
-func convertCodebook(alType *al64.ALADPCMBook) *adpcm.Codebook {
+func ConvertCodebook(alType *al64.ALADPCMBook) *adpcm.Codebook {
 	var result adpcm.Codebook
 
 	result.Order = int(alType.Order)
@@ -68,7 +68,7 @@ func convertLoop(alType *al64.ALADPCMloop) *adpcm.Loop {
 	}
 }
 
-func encodeSamples(data []int16, order binary.ByteOrder) []byte {
+func EncodeSamples(data []int16, order binary.ByteOrder) []byte {
 	var buffer bytes.Buffer
 
 	for _, val := range data {
@@ -76,6 +76,17 @@ func encodeSamples(data []int16, order binary.ByteOrder) []byte {
 	}
 
 	return buffer.Bytes()
+}
+
+func DecodeSamples(data []byte, order binary.ByteOrder) []int16 {
+	var buffer = bytes.NewBuffer(data)
+	var result = make([]int16, len(data)/2)
+
+	for index, _ := range result {
+		binary.Read(buffer, order, &result[index])
+	}
+
+	return result
 }
 
 func SwapEndian(data []byte) {
@@ -92,12 +103,12 @@ func WriteWav(filename string, wave *al64.ALWavetable, data []byte, sampleRate u
 		var frames = adpcm.DecodeADPCM(&adpcm.ADPCMEncodedData{
 			NSamples:   int(sampleCount),
 			SampleRate: float64(sampleRate),
-			Codebook:   convertCodebook(wave.AdpcWave.Book),
+			Codebook:   ConvertCodebook(wave.AdpcWave.Book),
 			Loop:       convertLoop(wave.AdpcWave.Loop),
 			Frames:     adpcm.ReadFrames(data),
 		})
 
-		data = encodeSamples(frames.Samples, binary.LittleEndian)
+		data = EncodeSamples(frames.Samples, binary.LittleEndian)
 		wave.Type = al64.AL_RAW16_WAVE
 	} else {
 		SwapEndian(data)
@@ -135,12 +146,12 @@ func WriteAiff(filename string, wave *al64.ALWavetable, data []byte, sampleRate 
 		var frames = adpcm.DecodeADPCM(&adpcm.ADPCMEncodedData{
 			NSamples:   int(sampleCount),
 			SampleRate: float64(sampleRate),
-			Codebook:   convertCodebook(wave.AdpcWave.Book),
+			Codebook:   ConvertCodebook(wave.AdpcWave.Book),
 			Loop:       convertLoop(wave.AdpcWave.Loop),
 			Frames:     adpcm.ReadFrames(data),
 		})
 
-		data = encodeSamples(frames.Samples, binary.BigEndian)
+		data = EncodeSamples(frames.Samples, binary.BigEndian)
 		wave.Type = al64.AL_RAW16_WAVE
 	}
 

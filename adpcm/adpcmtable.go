@@ -104,7 +104,7 @@ func acVect(input []int16, n int, m int, out []float64) {
 	for i := 0; i < n; i = i + 1 {
 		out[i] = 0
 		for j := 0; j < m; j = j + 1 {
-			out[i] = out[i] - float64(input[j-i]*input[j])
+			out[i] = out[i] - float64(input[j-i+m]*input[j+m])
 		}
 	}
 }
@@ -114,7 +114,7 @@ func acMat(input []int16, n int, m int, out [][]float64) {
 		for j := 1; j <= n; j = j + 1 {
 			out[i][j] = 0
 			for k := 0; k < m; k = k + 1 {
-				out[i][j] = out[i][j] + float64(input[k-i]*input[k-j])
+				out[i][j] = out[i][j] + float64(input[k-i+m]*input[k-j+m])
 			}
 		}
 	}
@@ -503,7 +503,17 @@ type CompressionSettings struct {
 	RefineIters int
 }
 
-func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (Codebook, error) {
+func DefaultCompressionSettings() CompressionSettings {
+	return CompressionSettings{
+		2,
+		16,
+		10,
+		2,
+		2,
+	}
+}
+
+func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (*Codebook, error) {
 	var curr = 0
 	var vec = make([]float64, settings.Order+1)
 
@@ -517,13 +527,19 @@ func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (Codebook
 	}
 
 	var dataSize = 0
+	var runningFrame = make([]int16, settings.FrameSize*2)
 
 	for ; curr < len(pcmData); curr = curr + settings.FrameSize {
 		var frame = readPcm(pcmData, curr, settings.FrameSize)
-		acVect(frame, settings.Order, settings.FrameSize, vec)
+
+		for i := 0; i < settings.FrameSize; i++ {
+			runningFrame[i+settings.FrameSize] = frame[i]
+		}
+
+		acVect(runningFrame, settings.Order, settings.FrameSize, vec)
 
 		if math.Abs(vec[0]) > settings.Threshold {
-			acMat(frame, settings.Order, settings.FrameSize, mat)
+			acMat(runningFrame, settings.Order, settings.FrameSize, mat)
 
 			var permDet int
 			var perm = make([]int, settings.Order+1)
@@ -547,6 +563,10 @@ func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (Codebook
 					dataSize = dataSize + 1
 				}
 			}
+		}
+
+		for i := 0; i < settings.FrameSize; i++ {
+			runningFrame[i] = runningFrame[i+settings.FrameSize]
 		}
 	}
 
@@ -613,8 +633,8 @@ func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (Codebook
 	}
 
 	if numOverflows > 0 {
-		return result, errors.New("There was overflow - check the table")
+		return &result, errors.New("There was overflow - check the table")
 	} else {
-		return result, nil
+		return &result, nil
 	}
 }

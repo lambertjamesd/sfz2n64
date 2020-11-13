@@ -1,13 +1,14 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/lambertjamesd/sfz2n64/aiff"
+	"github.com/lambertjamesd/sfz2n64/adpcm"
 	"github.com/lambertjamesd/sfz2n64/al64"
 	"github.com/lambertjamesd/sfz2n64/audioconvert"
 	"github.com/lambertjamesd/sfz2n64/convert"
@@ -103,35 +104,42 @@ func main() {
 		}
 
 		fmt.Printf("Wrote instrument file to %s", output)
-	} else if ext == ".aifc" || ext == ".aiff" {
-		file, err := os.Open(input)
+	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" {
+		sound, err := audioconvert.ReadWavetable(input)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		defer file.Close()
+		var outExt = filepath.Ext(output)
 
-		aiff, err := aiff.Parse(file)
+		if outExt == ".table" {
+			var codebook *adpcm.Codebook = nil
+			if sound.Wavetable.Type == al64.AL_RAW16_WAVE {
+				var compressionSettings = adpcm.DefaultCompressionSettings()
+				codebook, err = adpcm.CalculateCodebook(
+					audioconvert.DecodeSamples(sound.Wavetable.DataFromTable, binary.BigEndian),
+					&compressionSettings,
+				)
 
-		if err != nil {
-			log.Fatal(err)
-		}
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				codebook = audioconvert.ConvertCodebook(sound.Wavetable.AdpcWave.Book)
+			}
 
-		out, err := os.OpenFile(input+".out.aiff", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
+			outputFile, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 
-		aiff.Serialize(out)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		if err != nil {
-			log.Fatal(err)
-		}
+			codebook.Serialize(outputFile)
 
-		defer out.Close()
-
-		if aiff.Compressed {
-			log.Println("Compressed")
+			fmt.Printf("Wrote table to %s", output)
 		} else {
-			log.Println("Not Compressed")
+			fmt.Printf("Could not convert %s to %s", input, output)
 		}
 	} else if ext == ".sounds" {
 		err := convert.WriteSoundBank(input, os.Args[2:len(os.Args)])
