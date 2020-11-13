@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 3 {
+	if len(os.Args) < 3 {
 		log.Fatal(`Usage
 	sfz2n64 input.sfz output.inst
 	sfz2n64 input.sfz output.ctl
@@ -104,7 +104,7 @@ func main() {
 		}
 
 		fmt.Printf("Wrote instrument file to %s", output)
-	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" {
+	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" || ext == ".aif" {
 		sound, err := audioconvert.ReadWavetable(input)
 
 		if err != nil {

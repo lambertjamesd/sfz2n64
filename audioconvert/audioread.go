@@ -44,7 +44,7 @@ func wavToSoundEntry(filename string) (*al64.ALSound, error) {
 
 	result.Envelope = &al64.ALEnvelope{
 		AttackTime:   0,
-		DecayTime:    0,
+		DecayTime:    int32(1000000 * len(waveFile.Data) / 2 / int(waveFile.Header.SampleRate)),
 		ReleaseTime:  0,
 		AttackVolume: 127,
 		DecayVolume:  127,
@@ -90,6 +90,8 @@ func aiffToSoundEntry(filename string) (*al64.ALSound, error) {
 
 	var result al64.ALSound
 
+	var sampleRate = uint32(aiff.F64FromExtended(aiffFile.Common.SampleRate))
+
 	if aiffFile.Compressed {
 		// TODO
 	} else {
@@ -100,7 +102,15 @@ func aiffToSoundEntry(filename string) (*al64.ALSound, error) {
 			AdpcWave:       al64.ALADPCMWaveInfo{Loop: nil, Book: nil},
 			RawWave:        al64.ALRAWWaveInfo{Loop: nil},
 			DataFromTable:  aiffFile.SoundData.WaveformData,
-			FileSampleRate: uint32(aiff.F64FromExtended(aiffFile.Common.SampleRate)),
+			FileSampleRate: sampleRate,
+		}
+
+		result.Envelope = &al64.ALEnvelope{
+			AttackTime:   0,
+			DecayTime:    int32(1000000 * len(aiffFile.SoundData.WaveformData) / 2 / int(sampleRate)),
+			ReleaseTime:  0,
+			AttackVolume: 127,
+			DecayVolume:  127,
 		}
 		// TODO loops
 	}
@@ -113,7 +123,7 @@ func ReadWavetable(filename string) (*al64.ALSound, error) {
 
 	if ext == ".wav" {
 		return wavToSoundEntry(filename)
-	} else if ext == ".aiff" || ext == ".aifc" {
+	} else if ext == ".aiff" || ext == ".aifc" || ext == ".aif" {
 		return aiffToSoundEntry(filename)
 	} else {
 		return nil, errors.New("Not a supported sound file " + filename)
