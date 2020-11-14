@@ -91,7 +91,7 @@ func readPcm(pcmData []int16, start int, length int) []int16 {
 		dataToRead = start + length - len(pcmData)
 	}
 
-	if dataToRead > 0 {
+	if dataToRead == 0 {
 		return make([]int16, length)
 	} else if dataToRead == length {
 		return pcmData[start : start+dataToRead]
@@ -100,21 +100,21 @@ func readPcm(pcmData []int16, start int, length int) []int16 {
 	}
 }
 
-func acVect(input []int16, n int, m int, out []float64) {
-	for i := 0; i < n; i = i + 1 {
+func acVect(input []int16, order int, frameSize int, out []float64) {
+	for i := 0; i <= order; i = i + 1 {
 		out[i] = 0
-		for j := 0; j < m; j = j + 1 {
-			out[i] = out[i] - float64(input[j-i+m]*input[j+m])
+		for j := 0; j < frameSize; j = j + 1 {
+			out[i] -= float64(input[frameSize+j-i]) * float64(input[frameSize+j])
 		}
 	}
 }
 
-func acMat(input []int16, n int, m int, out [][]float64) {
-	for i := 1; i <= n; i = i + 1 {
-		for j := 1; j <= n; j = j + 1 {
+func acMat(input []int16, order int, frameSize int, out [][]float64) {
+	for i := 1; i <= order; i = i + 1 {
+		for j := 1; j <= order; j = j + 1 {
 			out[i][j] = 0
-			for k := 0; k < m; k = k + 1 {
-				out[i][j] = out[i][j] + float64(input[k-i+m]*input[k-j+m])
+			for k := 0; k < frameSize; k = k + 1 {
+				out[i][j] = out[i][j] + float64(input[frameSize+k-i]*input[frameSize+k-j])
 			}
 		}
 	}
@@ -543,7 +543,7 @@ func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (*Codeboo
 
 			var permDet int
 			var perm = make([]int, settings.Order+1)
-			if luDecomp(mat, settings.Order, perm, &permDet) {
+			if !luDecomp(mat, settings.Order, perm, &permDet) {
 				luDecompBackSub(mat, settings.Order, perm, vec)
 				vec[0] = 1
 				if kfroma(vec, spF4, settings.Order) == 0 {
