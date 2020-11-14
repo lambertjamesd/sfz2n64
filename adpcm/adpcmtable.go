@@ -114,7 +114,7 @@ func acMat(input []int16, order int, frameSize int, out [][]float64) {
 		for j := 1; j <= order; j = j + 1 {
 			out[i][j] = 0
 			for k := 0; k < frameSize; k = k + 1 {
-				out[i][j] = out[i][j] + float64(input[frameSize+k-i]*input[frameSize+k-j])
+				out[i][j] += float64(input[frameSize+k-i]) * float64(input[frameSize+k-j])
 			}
 		}
 	}
