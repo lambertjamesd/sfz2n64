@@ -39,6 +39,30 @@ type Token struct {
 	tType tokenType
 }
 
+func stringFromToken(value string) string {
+	var result []rune = make([]rune, 0, len(value))
+	var isEscape = false
+
+	for index, character := range value {
+		if index != 0 && index+1 != len(value) {
+			if isEscape {
+				if character == '\\' {
+					result = append(result, '\\')
+				} else if character == '"' {
+					result = append(result, '"')
+				}
+				isEscape = false
+			} else if character == '\\' {
+				isEscape = true
+			} else {
+				result = append(result, character)
+			}
+		}
+	}
+
+	return string(result)
+}
+
 func tokenizeIdentifier(next rune) (tokenType, tokenizeState) {
 	if unicode.IsLetter(next) || unicode.IsDigit(next) || next == '_' {
 		return tokenTypeNone, tokenizeIdentifier
@@ -65,11 +89,15 @@ func singleToken(tType tokenType) tokenizeState {
 	}
 }
 
+func tokenizeStringFinish(next rune) (tokenType, tokenizeState) {
+	return tokenTypeString, tokenizeDefaultState(next)
+}
+
 func tokenizeString(next rune) (tokenType, tokenizeState) {
 	if next == '\\' {
 		return tokenTypeNone, tokenizeStringEscape
 	} else if next == '"' {
-		return tokenTypeString, tokenizeDefaultState(next)
+		return tokenTypeNone, tokenizeStringFinish
 	} else if next == 0 {
 		return tokenTypeString, tokenizeDefaultState(next)
 	} else {
@@ -175,7 +203,7 @@ func tokenizeInst(characters []rune) []Token {
 	var curr = 0
 	var line = 0
 
-	for curr < len(characters) {
+	for curr <= len(characters) {
 		var nextToken tokenType
 
 		var character rune
@@ -207,6 +235,14 @@ func tokenizeInst(characters []rune) []Token {
 
 		curr = curr + 1
 	}
+
+	result = append(result, Token{
+		value: "EOF",
+		line:  line,
+		start: start,
+		end:   curr,
+		tType: tokenTypeEOF,
+	})
 
 	return result
 }

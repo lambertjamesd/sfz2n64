@@ -111,14 +111,22 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, parseErrors := al64.ParseIns(string(file), input)
+		insFile, parseErrors := al64.ParseIns(string(file), input, func(waveFilename string) (*al64.ALWavetable, error) {
+			sound, err := audioconvert.ReadWavetable(waveFilename)
+
+			if err != nil {
+				return nil, err
+			}
+
+			return sound.Wavetable, nil
+		})
 
 		if len(parseErrors) != 0 {
 			for _, err := range parseErrors {
-				log.Println(err.FormatError())
+				log.Println(err.Error())
 			}
 		} else {
-
+			log.Printf("Number of elements parsed %d", len(insFile.StructureOrder))
 		}
 	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" || ext == ".aif" {
 		sound, err := audioconvert.ReadWavetable(input)
