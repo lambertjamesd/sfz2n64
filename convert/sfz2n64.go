@@ -104,10 +104,20 @@ func sfzParseKeyMap(region *sfz.SfzFullRegion) (*al64.ALKeyMap, error) {
 	if tune == "" {
 		keyMap.Detune = 0
 	} else {
-		detune, err := strconv.ParseInt(pitch_keycenter, 10, 8)
+		detune, err := strconv.ParseInt(pitch_keycenter, 10, 32)
 
 		if err != nil {
 			return nil, err
+		}
+
+		for detune > 50 {
+			detune -= 100
+			keyMap.KeyBase--
+		}
+
+		for detune < -50 {
+			detune += 100
+			keyMap.KeyBase++
 		}
 
 		keyMap.Detune = uint8(detune)
@@ -130,31 +140,52 @@ func sfzParseEnvelope(region *sfz.SfzFullRegion) (*al64.ALEnvelope, error) {
 
 	result.AttackVolume = 127
 
-	attackTime, err := strconv.ParseFloat(attack, 64)
+	var attackTime float64
+	var decayTime float64
+	var releaseTime float64
+	var err error
 
-	if err != nil {
-		return nil, err
+	if attack != "" {
+		attackTime, err = strconv.ParseFloat(attack, 64)
+
+		if err != nil {
+			return nil, errors.New("ampeg_attack should be a number")
+		}
 	}
 
 	result.AttackTime = int32(attackTime * 1000000)
 
-	decayTime, err := strconv.ParseFloat(decay, 64)
+	if decay != "" {
+		decayTime, err = strconv.ParseFloat(decay, 64)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, errors.New("ampeg_decay should be a number")
+		}
 	}
 
 	result.DecayTime = int32(decayTime * 1000000)
 
-	releaseTime, err := strconv.ParseFloat(release, 64)
+	if release != "" {
+		releaseTime, err = strconv.ParseFloat(release, 64)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, errors.New("ampeg_attack should be a number")
+		}
 	}
 
 	result.ReleaseTime = int32(releaseTime * 1000000)
 
-	decayVolume, err := strconv.ParseFloat(decay, 64)
+	var decayVolume float64
+
+	if sustainLevel != "" {
+		decayVolume, err = strconv.ParseFloat(sustainLevel, 64)
+
+		if err != nil {
+			return nil, errors.New("ampeg_sustain should be a number")
+		}
+	} else {
+		decayVolume = 100
+	}
 
 	if decayVolume >= 100 {
 		result.DecayVolume = 127
@@ -275,6 +306,45 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 	}
 
 	sfzParseLoop(region, result)
+
+	offset := region.FindValue("offset")
+
+	var start = 0
+
+	if offset != "" {
+		offsetAsInt, err := strconv.ParseInt(offset, 10, 32)
+
+		if err != nil {
+			return nil, errors.New("offset should be number")
+		}
+
+		var data = result.Wavetable.DataFromTable
+		data = data[offsetAsInt*2 : len(data)]
+		result.Wavetable.DataFromTable = data
+
+		start = int(offsetAsInt)
+
+		if result.Wavetable.RawWave.Loop != nil {
+			result.Wavetable.RawWave.Loop.Start -= uint32(offsetAsInt)
+			result.Wavetable.RawWave.Loop.End -= uint32(offsetAsInt)
+		}
+	}
+
+	end := region.FindValue("end")
+
+	if end != "" {
+		endAsInt, err := strconv.ParseInt(end, 10, 32)
+
+		if err != nil {
+			return nil, errors.New("end should be number")
+		}
+
+		var data = result.Wavetable.DataFromTable
+		data = data[0 : (int(endAsInt)-start)*2]
+		result.Wavetable.DataFromTable = data
+	}
+
+	result.Wavetable.Len = int32(len(result.Wavetable.DataFromTable))
 
 	return result, nil
 }

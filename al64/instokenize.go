@@ -163,12 +163,11 @@ func tokenizeDefaultState(next rune) tokenizeState {
 	}
 }
 
-func tokenizeInst(input string) []Token {
-	if len(input) == 0 {
+func tokenizeInst(characters []rune) []Token {
+	if len(characters) == 0 {
 		return nil
 	}
 
-	var characters = []rune(input)
 	var state tokenizeState = tokenizeDefaultState(characters[0])
 
 	var result []Token = nil
@@ -189,14 +188,17 @@ func tokenizeInst(input string) []Token {
 
 		nextToken, state = state(character)
 
-		if nextToken != tokenTypeNone && nextToken != tokenTypeWhitespace {
-			result = append(result, Token{
-				value: string(characters[start:curr]),
-				line:  line,
-				start: start,
-				end:   curr,
-				tType: nextToken,
-			})
+		if nextToken != tokenTypeNone {
+			if nextToken != tokenTypeWhitespace {
+				result = append(result, Token{
+					value: string(characters[start:curr]),
+					line:  line,
+					start: start,
+					end:   curr,
+					tType: nextToken,
+				})
+			}
+			start = curr
 		}
 
 		if character == '\n' {

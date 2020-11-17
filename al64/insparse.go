@@ -3,6 +3,7 @@ package al64
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 type ParsedIns struct {
@@ -16,7 +17,13 @@ type deferredLink struct {
 	link     func(interface{})
 }
 
+type parseSource struct {
+	source []rune
+	name   string
+}
+
 type parseState struct {
+	source  *parseSource
 	tokens  []Token
 	current int
 	result  *ParsedIns
@@ -28,6 +35,36 @@ type parseState struct {
 type ParseError struct {
 	Token   *Token
 	Message string
+	source  *parseSource
+}
+
+func (source *parseSource) sourceContext(at int) (string, int) {
+	var start = at
+	var end = at
+
+	for start > 0 && source.source[start-1] != '\n' {
+		start--
+	}
+
+	for end < len(source.source) && source.source[end] != '\n' {
+		end++
+	}
+
+	return string(source.source[start:end]), at - start
+}
+
+func (err ParseError) FormatError() string {
+	contextString, col := err.source.sourceContext(err.Token.start)
+
+	return fmt.Sprintf(
+		"%s:%d:%d: %s\n%s\n%s^",
+		err.source.name,
+		int(err.Token.line+1),
+		int(col+1),
+		err.Message,
+		contextString,
+		strings.Repeat(" ", col),
+	)
 }
 
 const validStructureNames = "keymap, envelope, sound, instrument, or bank"
@@ -51,7 +88,7 @@ func (state *parseState) require(tokenType tokenType, expected string) *Token {
 		return result
 	} else {
 		if !state.inError {
-			state.errors = append(state.errors, ParseError{result, fmt.Sprintf("Expected %s but got %s", expected, result.value)})
+			state.errors = append(state.errors, ParseError{result, fmt.Sprintf("Expected %s but got %s", expected, result.value), state.source})
 			state.inError = true
 		}
 		state.advance()
@@ -109,12 +146,13 @@ func parseNumberValue(state *parseState, token *Token, min int64, max int64) int
 	asInt, err := strconv.ParseInt(token.value, 10, 64)
 
 	if err != nil {
-		state.errors = append(state.errors, ParseError{token, "Exected number value"})
+		state.errors = append(state.errors, ParseError{token, "Exected number value", state.source})
 		return min
 	} else if asInt < min || asInt > max {
 		state.errors = append(state.errors, ParseError{
 			token,
 			fmt.Sprintf("Exected number value in the range %d and %d", int(min), int(max)),
+			state.source,
 		})
 
 		if asInt < min {
@@ -139,22 +177,27 @@ func parseEnvelope(state *parseState) {
 	for state.hasMore() && parsing {
 		name, value := parseAttribute(state)
 
-		if name.value == "attackTime" {
-			result.AttackTime = int32(parseNumberValue(state, value, 0, 2147483647))
-		} else if name.value == "attackVolume" {
-			result.AttackVolume = uint8(parseNumberValue(state, value, 0, 127))
-		} else if name.value == "decayTime" {
-			result.DecayTime = int32(parseNumberValue(state, value, 0, 2147483647))
-		} else if name.value == "decayVolume" {
-			result.DecayVolume = uint8(parseNumberValue(state, value, 0, 127))
-		} else if name.value == "releaseTime" {
-			result.ReleaseTime = int32(parseNumberValue(state, value, 0, 2147483647))
-		} else {
-			state.errors = append(state.errors, ParseError{
-				name,
-				fmt.Sprintf("Unrecognized attribute '%s' for envelope", name.value),
-			})
+		if name != nil {
+			if name.value == "attackTime" {
+				result.AttackTime = int32(parseNumberValue(state, value, 0, 2147483647))
+			} else if name.value == "attackVolume" {
+				result.AttackVolume = uint8(parseNumberValue(state, value, 0, 127))
+			} else if name.value == "decayTime" {
+				result.DecayTime = int32(parseNumberValue(state, value, 0, 2147483647))
+			} else if name.value == "decayVolume" {
+				result.DecayVolume = uint8(parseNumberValue(state, value, 0, 127))
+			} else if name.value == "releaseTime" {
+				result.ReleaseTime = int32(parseNumberValue(state, value, 0, 2147483647))
+			} else {
+				state.errors = append(state.errors, ParseError{
+					name,
+					fmt.Sprintf("Unrecognized attribute '%s' for envelope", name.value),
+					state.source,
+				})
+			}
 		}
+
+		state.optional(tokenTypeSemiColon)
 
 		closeParen := state.optional(tokenTypeCloseCurly)
 
@@ -169,8 +212,6 @@ func parseEnvelope(state *parseState) {
 	if instrumentName != nil {
 		state.result.StructureByName[instrumentName.value] = &result
 	}
-
-	state.require(tokenTypeCloseCurly, "}")
 }
 
 func parseFile(state *parseState) {
@@ -179,29 +220,41 @@ func parseFile(state *parseState) {
 
 		if next != nil {
 			if next.value == "envelope" {
-
+				state.inError = false
+				parseEnvelope(state)
 			} else if next.value == "keymap" {
+				state.inError = false
 
 			} else if next.value == "sound" {
+				state.inError = false
 
 			} else if next.value == "instrument" {
+				state.inError = false
 
 			} else if next.value == "bank" {
+				state.inError = false
 
 			} else {
 				state.errors = append(state.errors, ParseError{
 					next,
 					fmt.Sprintf("Expected %s but got %s", validStructureNames, next.value),
+					state.source,
 				})
 			}
 		}
 	}
 }
 
-func ParseIns(input string) (*ParsedIns, []ParseError) {
-	token := tokenizeInst(input)
+func ParseIns(input string, inputName string) (*ParsedIns, []ParseError) {
+	var characters = []rune(input)
+
+	token := tokenizeInst(characters)
 
 	var state = parseState{
+		&parseSource{
+			characters,
+			inputName,
+		},
 		token,
 		0,
 		&ParsedIns{
@@ -225,6 +278,7 @@ func ParseIns(input string) (*ParsedIns, []ParseError) {
 			state.errors = append(state.errors, ParseError{
 				link.forToken,
 				fmt.Sprintf("Could not find %s", link.forToken.value),
+				state.source,
 			})
 		}
 	}

@@ -75,6 +75,58 @@ type sfzParseContext struct {
 	defaultPath  string
 }
 
+const (
+	commentStatePass            = 0
+	commentStateCommentStart    = 1
+	commentStateLineComment     = 2
+	commentStateMultiComment    = 3
+	commentStateMultiCommentEnd = 4
+)
+
+func stripComments(input string) string {
+	var inputRunes = []rune(input)
+	var output []rune = make([]rune, 0, len(inputRunes))
+
+	var state = commentStatePass
+
+	for _, char := range inputRunes {
+		switch state {
+		case commentStatePass:
+			if char == '/' {
+				state = commentStateCommentStart
+			} else {
+				output = append(output, char)
+			}
+		case commentStateCommentStart:
+			if char == '/' {
+				state = commentStateLineComment
+			} else if char == '*' {
+				state = commentStateMultiComment
+			} else {
+				output = append(output, '/', char)
+				state = commentStatePass
+			}
+		case commentStateLineComment:
+			if char == '\n' {
+				output = append(output, char)
+				state = commentStatePass
+			}
+		case commentStateMultiComment:
+			if char == '*' {
+				state = commentStateMultiCommentEnd
+			}
+		case commentStateMultiCommentEnd:
+			if char == '/' {
+				state = commentStatePass
+			} else if char != '*' {
+				state = commentStateMultiComment
+			}
+		}
+	}
+
+	return string(output)
+}
+
 func createStackFrame(filename string) (*sfzParseStackFrame, error) {
 	content, err := ioutil.ReadFile(filename)
 
@@ -82,8 +134,10 @@ func createStackFrame(filename string) (*sfzParseStackFrame, error) {
 		return nil, err
 	}
 
+	var stripped = stripComments(string(content))
+
 	return &sfzParseStackFrame{
-		[]rune(string(content)),
+		[]rune(stripped),
 		0,
 		path.Dir(filename),
 	}, nil
@@ -93,22 +147,25 @@ func isSeparator(char rune) bool {
 	return char == ' ' || char == '\t' || char == '\n' || char == '\r' || char == '='
 }
 
-func skipComment(frame *sfzParseStackFrame) bool {
-	var curr = frame.parsePos
+func skipComment(frame *sfzParseStackFrame, curr int) int {
 
-	if curr+2 > len(frame.source) || frame.source[curr] != '/' || frame.source[curr+1] != '/' {
-		return false
+	if curr+2 > len(frame.source) ||
+		frame.source[curr] != '/' ||
+		(frame.source[curr+1] != '/' && frame.source[curr+1] != '*') {
+		return curr
 	}
 
-	for curr < len(frame.source) && frame.source[curr] != '\n' {
+	var isMultiline = frame.source[curr+1] == '*'
+
+	for !isMultiline && curr < len(frame.source) && frame.source[curr] != '\n' ||
+		isMultiline && curr+1 < len(frame.source) && (frame.source[curr] != '*' || frame.source[curr+1] != '/') {
 		curr = curr + 1
 	}
 
-	if frame.parsePos != curr {
-		frame.parsePos = curr
-		return true
+	if isMultiline {
+		return curr + 2
 	} else {
-		return false
+		return curr + 1
 	}
 }
 
@@ -123,7 +180,13 @@ func nextToken(context *sfzParseContext, frame *sfzParseStackFrame) (token strin
 			curr = curr + 1
 		}
 
-		skippingWhitespace = skipComment(frame)
+		var next = skipComment(frame, curr)
+
+		if next == curr {
+			skippingWhitespace = false
+		}
+
+		curr = next
 	}
 
 	var tokenStart = curr

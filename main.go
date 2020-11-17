@@ -50,7 +50,7 @@ func main() {
 
 		var isSingle = convert.SfzIsSingleInstrument(sfzFile)
 
-		if outExt == ".inst" {
+		if outExt == ".ins" {
 			var instrumentNames []string = nil
 
 			if isSingle {
@@ -91,7 +91,7 @@ func main() {
 
 		var outExt = filepath.Ext(output)
 
-		if outExt == ".inst" {
+		if outExt == ".ins" {
 			err = convert.WriteInsFile(bankFile, tblData, output, nil, false)
 		} else if outExt == ".sfz" {
 			err = convert.WriteSfzFile(bankFile, tblData, output)
@@ -104,6 +104,22 @@ func main() {
 		}
 
 		fmt.Printf("Wrote instrument file to %s", output)
+	} else if ext == ".ins" {
+		file, err := ioutil.ReadFile(input)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, parseErrors := al64.ParseIns(string(file), input)
+
+		if len(parseErrors) != 0 {
+			for _, err := range parseErrors {
+				log.Println(err.FormatError())
+			}
+		} else {
+
+		}
 	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" || ext == ".aif" {
 		sound, err := audioconvert.ReadWavetable(input)
 

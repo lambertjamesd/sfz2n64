@@ -53,7 +53,7 @@ func writeKeyMap(state *insConversionState, source interface{}, output *os.File)
 	output.WriteString(fmt.Sprintf("    keyMin = %d;\n", keymap.KeyMin))
 	output.WriteString(fmt.Sprintf("    keyMax = %d;\n", keymap.KeyMax))
 	output.WriteString(fmt.Sprintf("    keyBase = %d;\n", keymap.KeyBase))
-	output.WriteString(fmt.Sprintf("    detune = %d;\n", keymap.Detune))
+	output.WriteString(fmt.Sprintf("    detune = %d;\n", int8(keymap.Detune)))
 
 	_, err = output.WriteString("}\n")
 
@@ -259,7 +259,7 @@ func writeALBank(state *insConversionState, source interface{}, output *os.File)
 			if instrument != nil {
 				instrumentName, _ := state.writeSection(instrument, output, state.getInstrumentName(index), writeInstInstrument)
 
-				_, err = output.WriteString(fmt.Sprintf("    program [%d] = %s;\n", index, instrumentName))
+				_, err = output.WriteString(fmt.Sprintf("    instrument [%d] = %s;\n", index, instrumentName))
 
 				if err != nil {
 					return name, err
