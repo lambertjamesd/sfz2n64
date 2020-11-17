@@ -20,6 +20,7 @@ const (
 	tokenTypeSemiColon
 	tokenTypeComment
 	tokenTypeWhitespace
+	tokenTypeEOF
 )
 
 type tokenizeState func(next rune) (tokenType, tokenizeState)
@@ -30,7 +31,7 @@ type tokenizer struct {
 	state        tokenizeState
 }
 
-type token struct {
+type Token struct {
 	value string
 	line  int
 	start int
@@ -39,7 +40,7 @@ type token struct {
 }
 
 func tokenizeIdentifier(next rune) (tokenType, tokenizeState) {
-	if unicode.IsLetter(next) || unicode.IsDigit(next) {
+	if unicode.IsLetter(next) || unicode.IsDigit(next) || next == '_' {
 		return tokenTypeNone, tokenizeIdentifier
 	} else {
 		return tokenTypeIdentifier, tokenizeDefaultState(next)
@@ -69,17 +70,23 @@ func tokenizeString(next rune) (tokenType, tokenizeState) {
 		return tokenTypeNone, tokenizeStringEscape
 	} else if next == '"' {
 		return tokenTypeString, tokenizeDefaultState(next)
+	} else if next == 0 {
+		return tokenTypeString, tokenizeDefaultState(next)
 	} else {
 		return tokenTypeNone, tokenizeString
 	}
 }
 
 func tokenizeStringEscape(next rune) (tokenType, tokenizeState) {
-	return tokenTypeNone, tokenizeString
+	if next == 0 {
+		return tokenTypeString, tokenizeDefaultState(next)
+	} else {
+		return tokenTypeNone, tokenizeString
+	}
 }
 
 func tokenizeCommentSingle(next rune) (tokenType, tokenizeState) {
-	if next == '\n' {
+	if next == '\n' || next == 0 {
 		return tokenTypeComment, tokenizeWhitespace
 	} else {
 		return tokenTypeNone, tokenizeCommentSingle
@@ -89,13 +96,15 @@ func tokenizeCommentSingle(next rune) (tokenType, tokenizeState) {
 func tokenizeCommentMulti(next rune) (tokenType, tokenizeState) {
 	if next == '*' {
 		return tokenTypeNone, tokenizeCommentMultiEnd
+	} else if next == 0 {
+		return tokenTypeComment, tokenizeDefaultState(next)
 	} else {
 		return tokenTypeNone, tokenizeCommentMulti
 	}
 }
 
 func tokenizeCommentMultiEnd(next rune) (tokenType, tokenizeState) {
-	if next == '/' {
+	if next == '/' || next == 0 {
 		return tokenTypeComment, tokenizeDefaultState(next)
 	} else if next == '*' {
 		return tokenTypeNone, tokenizeCommentMultiEnd
@@ -145,7 +154,7 @@ func tokenizeDefaultState(next rune) tokenizeState {
 		return tokenizeCommentStart
 	} else if unicode.IsSpace(next) {
 		return tokenizeWhitespace
-	} else if unicode.IsLetter(next) {
+	} else if unicode.IsLetter(next) || next == '_' {
 		return tokenizeIdentifier
 	} else if unicode.IsDigit(next) {
 		return tokenizeNumber
@@ -154,8 +163,48 @@ func tokenizeDefaultState(next rune) tokenizeState {
 	}
 }
 
-func tokenizeInst(input string) []token {
-	var result []token = nil
+func tokenizeInst(input string) []Token {
+	if len(input) == 0 {
+		return nil
+	}
+
+	var characters = []rune(input)
+	var state tokenizeState = tokenizeDefaultState(characters[0])
+
+	var result []Token = nil
+	var start = 0
+	var curr = 0
+	var line = 0
+
+	for curr < len(characters) {
+		var nextToken tokenType
+
+		var character rune
+
+		if curr < len(characters) {
+			character = characters[curr]
+		} else {
+			character = 0
+		}
+
+		nextToken, state = state(character)
+
+		if nextToken != tokenTypeNone && nextToken != tokenTypeWhitespace {
+			result = append(result, Token{
+				value: string(characters[start:curr]),
+				line:  line,
+				start: start,
+				end:   curr,
+				tType: nextToken,
+			})
+		}
+
+		if character == '\n' {
+			line = line + 1
+		}
+
+		curr = curr + 1
+	}
 
 	return result
 }
