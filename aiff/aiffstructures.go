@@ -82,6 +82,16 @@ type Aiff struct {
 	Application []*ApplicationChunk
 }
 
+func (markers *MarkerChunk) FindMarker(id uint16) *Marker {
+	for _, marker := range markers.Markers {
+		if marker.ID == id {
+			return &marker
+		}
+	}
+
+	return nil
+}
+
 func ExtendedFromF64(val float64) ExtendedFloat {
 	var asInt = math.Float64bits(val)
 

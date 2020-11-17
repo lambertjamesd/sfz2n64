@@ -126,6 +126,20 @@ func main() {
 				log.Println(err.Error())
 			}
 		} else {
+			var outExt = filepath.Ext(output)
+
+			if outExt == ".sfz" {
+				err = convert.WriteSfzFile(insFile.BankFile, insFile.TblData, output)
+			} else if outExt == ".ctl" {
+				err = convert.WriteSfzFile(insFile.BankFile, insFile.TblData, output)
+			} else {
+				log.Fatal("Outut file should be of type .sfz or .ctl")
+			}
+
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			log.Printf("Number of elements parsed %d", len(insFile.StructureOrder))
 		}
 	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" || ext == ".aif" {

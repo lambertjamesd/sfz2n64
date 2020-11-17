@@ -40,6 +40,7 @@ type ParsedIns struct {
 	StructureOrder  []structureType
 	StructureByName map[string]structureType
 	BankFile        *ALBankFile
+	TblData         []byte
 }
 
 type deferredLink struct {
@@ -578,6 +579,7 @@ func ParseIns(input string, inputName string, loader WaveTableLoader) (*ParsedIn
 			nil,
 			make(map[string]structureType),
 			&ALBankFile{nil},
+			nil,
 		},
 		false,
 		nil,
@@ -606,6 +608,8 @@ func ParseIns(input string, inputName string, loader WaveTableLoader) (*ParsedIn
 			})
 		}
 	}
+
+	state.result.TblData = TblFromBank(state.result.BankFile)
 
 	return state.result, state.errors
 }

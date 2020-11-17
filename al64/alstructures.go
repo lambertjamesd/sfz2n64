@@ -112,3 +112,26 @@ type ALBankFile struct {
 	// BankCount int16
 	BankArray []*ALBank
 }
+
+func TblFromBank(bankFile *ALBankFile) []byte {
+	var result []byte = nil
+	var base int32 = 0
+
+	for _, bank := range bankFile.BankArray {
+		for _, inst := range bank.InstArray {
+			if inst != nil {
+				for _, sound := range inst.SoundArray {
+					if sound != nil && sound.Wavetable != nil {
+						sound.Wavetable.Base = base
+						sound.Wavetable.Len = int32(len(sound.Wavetable.DataFromTable))
+						base += sound.Wavetable.Len
+
+						result = append(result, sound.Wavetable.DataFromTable...)
+					}
+				}
+			}
+		}
+	}
+
+	return result
+}

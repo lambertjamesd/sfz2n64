@@ -1,6 +1,8 @@
 package audioconvert
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -93,7 +95,64 @@ func aiffToSoundEntry(filename string) (*al64.ALSound, error) {
 	var sampleRate = uint32(aiff.F64FromExtended(aiffFile.Common.SampleRate))
 
 	if aiffFile.Compressed {
-		// TODO
+		result.Wavetable = &al64.ALWavetable{
+			Base:           0,
+			Len:            int32(len(aiffFile.SoundData.WaveformData)) * 16 / 9,
+			Type:           al64.AL_ADPCM_WAVE,
+			AdpcWave:       al64.ALADPCMWaveInfo{Loop: nil, Book: nil},
+			RawWave:        al64.ALRAWWaveInfo{Loop: nil},
+			DataFromTable:  aiffFile.SoundData.WaveformData,
+			FileSampleRate: sampleRate,
+		}
+
+		for _, chunk := range aiffFile.Application {
+			if chunk.Signature == 0x73746F63 {
+				var buffer = bytes.NewBuffer(chunk.Data)
+				var headerLen uint8
+				binary.Read(buffer, &binary.BigEndian, &headerLen)
+				var data = make([]byte, headerLen)
+				buffer.Read(data)
+
+				var headerName = string(data)
+
+				if headerName == "VADPCMCODES" {
+					var version uint16
+					binary.Read(buffer, binary.BigEndian, &version)
+
+					if version == 1 {
+						var book al64.ALADPCMBook
+						binary.Read(buffer, binary.BigEndian, &version)
+						book.Order = int32(version)
+						binary.Read(buffer, binary.BigEndian, &version)
+						book.NPredictors = int32(version)
+
+						book.Book = make([]int16, 8*book.Order*book.NPredictors)
+
+						for i := 0; i < len(book.Book); i++ {
+							binary.Read(buffer, binary.BigEndian, &book.Book[i])
+						}
+						result.Wavetable.AdpcWave.Book = &book
+					}
+				} else if headerName == "VADPCMLOOPS" {
+					var version uint16
+					var loops uint16
+					binary.Read(buffer, binary.BigEndian, &version)
+					binary.Read(buffer, binary.BigEndian, &loops)
+
+					if version == 1 && loops == 1 {
+						var loop al64.ALADPCMloop
+						binary.Read(buffer, binary.BigEndian, &loop.Start)
+						binary.Read(buffer, binary.BigEndian, &loop.End)
+						binary.Read(buffer, binary.BigEndian, &loop.Count)
+
+						for index, _ := range loop.State {
+							binary.Read(buffer, binary.BigEndian, &loop.State[index])
+						}
+						result.Wavetable.AdpcWave.Loop = &loop
+					}
+				}
+			}
+		}
 	} else {
 		result.Wavetable = &al64.ALWavetable{
 			Base:           0,
@@ -111,6 +170,29 @@ func aiffToSoundEntry(filename string) (*al64.ALSound, error) {
 			ReleaseTime:  0,
 			AttackVolume: 127,
 			DecayVolume:  127,
+		}
+
+		if aiffFile.Instrument != nil && aiffFile.Markers != nil {
+			var loop al64.ALRawLoop
+			var start = aiffFile.Markers.FindMarker(aiffFile.Instrument.SustainLoop.BeginLoop)
+			var end = aiffFile.Markers.FindMarker(aiffFile.Instrument.SustainLoop.EndLoop)
+
+			if start == nil {
+				start = aiffFile.Markers.FindMarker(aiffFile.Instrument.ReleaseLoop.BeginLoop)
+				end = aiffFile.Markers.FindMarker(aiffFile.Instrument.ReleaseLoop.EndLoop)
+			}
+
+			if start != nil {
+				loop.Start = start.Position
+			}
+
+			if end != nil {
+				loop.End = end.Position
+			}
+
+			loop.Count = 0xffffffff
+
+			result.Wavetable.RawWave.Loop = &loop
 		}
 		// TODO loops
 	}
