@@ -4,7 +4,7 @@ Converts SFZ files to a format the N64 can use as part of instrument banks
 
 ## Usage
 
-sfz2n64 takes the first parameter as the input, which can be an .sfz file or a .ctl file. The second parameter is the output which can be a .inst, .ctl, or a .sfz file.
+sfz2n64 takes the first parameter as the input, which can be an .sfz file, .ins or a .ctl file. The second parameter is the output which can be a .ins, .ctl, or a .sfz file.
 
 For example
 
@@ -17,14 +17,14 @@ sfz2n64 input.sfz output.ctl
 Changing the extension of the output changes the format
 
 ```
-sfz2n64 input.sfz output.inst
+sfz2n64 input.sfz output.ins
 ```
 
 This will also create a sounds folder to to save all of the sound data to
 
 ## Making instrument banks with sfz
 
-A single sfz file represents a single instrument wherease a .inst file or a .ctl file
+A single sfz file represents a single instrument wherease a .ins file or a .ctl file
 may contain multiple instruments. To solve this problem a custom sfz file, not actually an instrument, is needed for combining multiple sfz instruments into a bank The format is described below
 
 ```

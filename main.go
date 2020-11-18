@@ -18,11 +18,14 @@ import (
 func main() {
 	if len(os.Args) < 3 {
 		log.Fatal(`Usage
-	sfz2n64 input.sfz output.inst
+	sfz2n64 input.sfz output.ins
 	sfz2n64 input.sfz output.ctl
 
-	sfz2n64 input.ctl output.inst
+	sfz2n64 input.ctl output.ins
 	sfz2n64 input.ctl output.sfz
+
+	sfz2n64 input.ins output.sfz
+	sfz2n64 input.ins output.ctl
 `)
 	}
 
@@ -64,7 +67,7 @@ func main() {
 		} else if outExt == ".ctl" {
 			err = convert.WriteSfzFile(bankFile, tblData, output)
 		} else {
-			log.Fatal("Outut file should be of type .inst or .sfz")
+			log.Fatal("Outut file should be of type .ins or .sfz")
 		}
 
 		fmt.Printf("Wrote instrument file to %s", output)
@@ -96,7 +99,7 @@ func main() {
 		} else if outExt == ".sfz" {
 			err = convert.WriteSfzFile(bankFile, tblData, output)
 		} else {
-			log.Fatal("Outut file should be of type .inst or .sfz")
+			log.Fatal("Outut file should be of type .ins or .sfz")
 		}
 
 		if err != nil {
