@@ -25,6 +25,13 @@ func WriteSoundBank(outputName string, inputSounds []string) error {
 	var soundData al64.SoundArray = al64.SoundArray{Sounds: nil}
 
 	for _, sound := range sounds {
+		var padding = ((offset + 0xf) & ^0xf) - offset
+
+		if padding != 0 {
+			offset = offset + padding
+			combinedData = append(combinedData, make([]byte, padding)...)
+		}
+
 		sound.Wavetable.Base = sound.Wavetable.Base + offset
 		offset = offset + int32(len(sound.Wavetable.DataFromTable))
 		soundData.Sounds = append(soundData.Sounds, sound)

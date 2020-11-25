@@ -122,6 +122,13 @@ func TblFromBank(bankFile *ALBankFile) []byte {
 			if inst != nil {
 				for _, sound := range inst.SoundArray {
 					if sound != nil && sound.Wavetable != nil {
+						var padding = ((base + 0xf) & ^0xf) - base
+
+						if padding != 0 {
+							base = base + padding
+							result = append(result, make([]byte, padding)...)
+						}
+
 						sound.Wavetable.Base = base
 						sound.Wavetable.Len = int32(len(sound.Wavetable.DataFromTable))
 						base += sound.Wavetable.Len

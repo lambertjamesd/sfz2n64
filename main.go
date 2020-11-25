@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/lambertjamesd/sfz2n64/adpcm"
 	"github.com/lambertjamesd/sfz2n64/al64"
@@ -15,11 +17,55 @@ import (
 	"github.com/lambertjamesd/sfz2n64/sfz"
 )
 
+func ParseArgs(args []string) (map[string]string, []string) {
+	var named = make(map[string]string)
+	var ordered []string = nil
+
+	var lastName string = ""
+
+	for _, curr := range args {
+		if lastName != "" {
+			named[lastName] = curr
+			lastName = ""
+		} else if len(curr) != 0 && curr[0] == '-' {
+			lastName = curr
+		} else {
+			ordered = append(ordered, curr)
+		}
+	}
+
+	return named, ordered
+}
+
+type SFZConvertArgs struct {
+	TargetSampleRate int
+}
+
+func ParseSFZConvertArgs(args map[string]string) (*SFZConvertArgs, error) {
+	var result SFZConvertArgs
+
+	for name, value := range args {
+		if name == "-s" || name == "--sample" {
+			sampleRate, err := strconv.ParseInt(value, 10, 32)
+
+			if err != nil {
+				return nil, err
+			}
+
+			result.TargetSampleRate = int(sampleRate)
+		} else {
+			return nil, errors.New("Unrecognized input " + name)
+		}
+	}
+
+	return &result, nil
+}
+
 func main() {
 	if len(os.Args) < 3 {
 		log.Fatal(`Usage
-	sfz2n64 input.sfz output.ins
-	sfz2n64 input.sfz output.ctl
+	sfz2n64 input.sfz output.ins [-s --sample_rate sampleRate]
+	sfz2n64 input.sfz output.ctl [-s --sample_rate sampleRate]
 
 	sfz2n64 input.ctl output.ins
 	sfz2n64 input.ctl output.sfz
@@ -29,12 +75,20 @@ func main() {
 `)
 	}
 
-	var input = os.Args[1]
+	namedArgs, orderedArgs := ParseArgs(os.Args)
+
+	var input = orderedArgs[1]
 
 	var ext = filepath.Ext(input)
-	var output = os.Args[2]
+	var output = orderedArgs[2]
 
 	if ext == ".sfz" {
+		args, err := ParseSFZConvertArgs(namedArgs)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		sfzFile, err := sfz.ParseSfz(input)
 
 		if err != nil {
@@ -45,6 +99,10 @@ func main() {
 
 		if err != nil {
 			log.Fatal(err)
+		}
+
+		if args.TargetSampleRate != 0 {
+			bankFile = audioconvert.ResampleBankFile(bankFile, args.TargetSampleRate)
 		}
 
 		var outExt = filepath.Ext(output)
@@ -183,7 +241,7 @@ func main() {
 			fmt.Printf("Could not convert %s to %s", input, output)
 		}
 	} else if ext == ".sounds" {
-		err := convert.WriteSoundBank(input, os.Args[2:len(os.Args)])
+		err := convert.WriteSoundBank(input, orderedArgs[2:len(os.Args)])
 
 		if err != nil {
 			log.Fatal(err)
