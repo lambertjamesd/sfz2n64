@@ -24,7 +24,7 @@ func GetSample(input []int16, at float32) int16 {
 }
 
 func Resample(input []int16, from int, to int) []int16 {
-	var result []int16 = make([]int16, len(input)*from/to)
+	var result []int16 = make([]int16, len(input)*to/from)
 
 	var scale = float32(from) / float32(to)
 
@@ -38,7 +38,7 @@ func Resample(input []int16, from int, to int) []int16 {
 func ResampleWavetable(wavetable *al64.ALWavetable, to int, from int) *al64.ALWavetable {
 	if wavetable == nil {
 		return nil
-	} else if wavetable.Type == al64.AL_RAW16_WAVE {
+	} else if wavetable.Type != al64.AL_RAW16_WAVE {
 		// TODO resample compressed data
 		return wavetable
 	}
