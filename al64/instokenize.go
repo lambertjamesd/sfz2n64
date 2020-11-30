@@ -184,7 +184,7 @@ func tokenizeDefaultState(next rune) tokenizeState {
 		return tokenizeWhitespace
 	} else if unicode.IsLetter(next) || next == '_' {
 		return tokenizeIdentifier
-	} else if unicode.IsDigit(next) {
+	} else if unicode.IsDigit(next) || next == '-' {
 		return tokenizeNumber
 	} else {
 		return tokenizeError

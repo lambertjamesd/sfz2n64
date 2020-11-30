@@ -264,6 +264,16 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 		return nil, err
 	}
 
+	if env == nil {
+		env = &al64.ALEnvelope{
+			AttackTime:   0,
+			DecayTime:    int32(1000000 * len(result.Wavetable.DataFromTable) / 2 / int(result.Wavetable.FileSampleRate)),
+			ReleaseTime:  0,
+			AttackVolume: 127,
+			DecayVolume:  127,
+		}
+	}
+
 	result.Envelope = env
 
 	pan := region.FindValue("pan")
@@ -400,10 +410,24 @@ func sfzParseAsBankFile(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFil
 	var result al64.ALBankFile
 	var currentBank *al64.ALBank
 
+	var firstProgramIndex = 1
+
 	for _, section := range input.Sections {
 		if section.Name == "<bank>" {
 			currentBank = &al64.ALBank{SampleRate: 0, Percussion: nil, InstArray: nil}
 			result.BankArray = append(result.BankArray, currentBank)
+
+			var firstProgramIndexString = section.FindValue("first_program_index")
+
+			if firstProgramIndexString != "" {
+				parsedInt, err := strconv.ParseInt(firstProgramIndexString, 10, 32)
+
+				if err != nil {
+					return nil, errors.New("first_program_index must be a number")
+				}
+
+				firstProgramIndex = int(parsedInt)
+			}
 		} else if section.Name == "<percussion>" {
 			if currentBank == nil {
 				currentBank = &al64.ALBank{SampleRate: 0, Percussion: nil, InstArray: nil}
@@ -442,11 +466,16 @@ func sfzParseAsBankFile(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFil
 					return nil, errors.New(fmt.Sprintf("program_number should be a number not '%s'", programNumberAsString))
 				}
 
-				if parsedInt < 1 || parsedInt > 128 {
-					return nil, errors.New(fmt.Sprintf("program_number should be a number between 1 and 128 not '%s'", programNumberAsString))
-				}
+				programNumber = int(parsedInt) - firstProgramIndex
 
-				programNumber = int(parsedInt) - 1
+				if parsedInt < 0 || parsedInt > 127 {
+					return nil, errors.New(fmt.Sprintf(
+						"program_number should be a number between %d and %d not '%s'",
+						firstProgramIndex,
+						firstProgramIndex+127,
+						programNumberAsString,
+					))
+				}
 			}
 
 			for programNumber >= len(currentBank.InstArray) {
@@ -472,6 +501,8 @@ func sfzParseAsBankFile(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFil
 			}
 		}
 	}
+
+	result.CorrectOverlap()
 
 	return &result, nil
 }

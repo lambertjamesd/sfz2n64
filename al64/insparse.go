@@ -649,7 +649,8 @@ func ParseIns(input string, inputName string, loader WaveTableLoader) (*ParsedIn
 		}
 	}
 
-	state.result.TblData = TblFromBank(state.result.BankFile)
+	_, tblData := state.result.BankFile.LayoutTbl(0, nil)
+	state.result.TblData = tblData
 
 	return state.result, state.errors
 }

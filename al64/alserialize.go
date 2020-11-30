@@ -495,3 +495,42 @@ func (soundArray *SoundArray) Serialize(target io.Writer) error {
 	state.layoutSerializable(soundArray)
 	return state.writeOut(target)
 }
+
+func (sound *ALSound) LayoutTbl(offset int32, tblData []byte) (int32, []byte) {
+	var padding = ((offset + 0xf) & ^0xf) - offset
+
+	if padding != 0 {
+		offset = offset + padding
+		tblData = append(tblData, make([]byte, padding)...)
+	}
+
+	sound.Wavetable.Base = sound.Wavetable.Base + offset
+	offset = offset + int32(len(sound.Wavetable.DataFromTable))
+	tblData = append(tblData, sound.Wavetable.DataFromTable...)
+
+	return offset, tblData
+}
+
+func (instrument *ALInstrument) LayoutTbl(offset int32, tblData []byte) (int32, []byte) {
+	if instrument == nil {
+		return offset, tblData
+	}
+
+	for _, sound := range instrument.SoundArray {
+		offset, tblData = sound.LayoutTbl(offset, tblData)
+	}
+
+	return offset, tblData
+}
+
+func (bankFile *ALBankFile) LayoutTbl(offset int32, tblData []byte) (int32, []byte) {
+
+	for _, bank := range bankFile.BankArray {
+		offset, tblData = bank.Percussion.LayoutTbl(offset, tblData)
+		for _, ins := range bank.InstArray {
+			offset, tblData = ins.LayoutTbl(offset, tblData)
+		}
+	}
+
+	return offset, tblData
+}

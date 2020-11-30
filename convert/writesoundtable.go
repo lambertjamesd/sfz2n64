@@ -34,17 +34,9 @@ func WriteSoundBank(outputName string, inputSounds []string, compressionSettings
 	var soundData al64.SoundArray = al64.SoundArray{Sounds: nil}
 
 	for _, sound := range sounds {
-		var padding = ((offset + 0xf) & ^0xf) - offset
+		offset, combinedData = sound.LayoutTbl(offset, combinedData)
 
-		if padding != 0 {
-			offset = offset + padding
-			combinedData = append(combinedData, make([]byte, padding)...)
-		}
-
-		sound.Wavetable.Base = sound.Wavetable.Base + offset
-		offset = offset + int32(len(sound.Wavetable.DataFromTable))
 		soundData.Sounds = append(soundData.Sounds, sound)
-		combinedData = append(combinedData, sound.Wavetable.DataFromTable...)
 	}
 
 	outFile, err := os.OpenFile(outputName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
@@ -70,6 +62,40 @@ func WriteSoundBank(outputName string, inputSounds []string, compressionSettings
 	defer tblFile.Close()
 
 	_, err = tblFile.Write(combinedData)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func WriteCtlFile(outputName string, bankFile *al64.ALBankFile) error {
+	_, tblData := bankFile.LayoutTbl(0, nil)
+
+	outFile, err := os.OpenFile(outputName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+
+	if err != nil {
+		return err
+	}
+
+	defer outFile.Close()
+
+	err = bankFile.Serialize(outFile)
+
+	if err != nil {
+		return err
+	}
+
+	tblFile, err := os.OpenFile(outputName+".tbl", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+
+	if err != nil {
+		return err
+	}
+
+	defer tblFile.Close()
+
+	_, err = tblFile.Write(tblData)
 
 	if err != nil {
 		return err

@@ -192,12 +192,12 @@ func main() {
 
 			err = convert.WriteInsFile(bankFile, tblData, output, instrumentNames, isSingle)
 		} else if outExt == ".ctl" {
-			err = convert.WriteSfzFile(bankFile, tblData, output)
+			err = convert.WriteCtlFile(output, bankFile)
 		} else {
-			log.Fatal("Outut file should be of type .ins or .sfz")
+			log.Fatal("Outut file should be of type .ins or .sfz\n")
 		}
 
-		fmt.Printf("Wrote instrument file to %s", output)
+		fmt.Printf("Wrote instrument file to %s\n", output)
 	} else if ext == ".ctl" {
 		file, err := os.Open(input)
 
@@ -226,14 +226,14 @@ func main() {
 		} else if outExt == ".sfz" {
 			err = convert.WriteSfzFile(bankFile, tblData, output)
 		} else {
-			log.Fatal("Outut file should be of type .ins or .sfz")
+			log.Fatal("Outut file should be of type .ins or .sfz\n")
 		}
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("Wrote instrument file to %s", output)
+		fmt.Printf("Wrote instrument file to %s\n", output)
 	} else if ext == ".ins" {
 		file, err := ioutil.ReadFile(input)
 
@@ -261,7 +261,7 @@ func main() {
 			if outExt == ".sfz" {
 				err = convert.WriteSfzFile(insFile.BankFile, insFile.TblData, output)
 			} else if outExt == ".ctl" {
-				err = convert.WriteSoundBank(insFile.BankFile, insFile.TblData, output)
+				err = convert.WriteCtlFile(output, insFile.BankFile)
 			} else {
 				log.Fatal("Outut file should be of type .sfz or .ctl")
 			}

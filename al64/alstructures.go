@@ -1,5 +1,7 @@
 package al64
 
+import "fmt"
+
 type ALWaveType uint8
 
 const (
@@ -141,4 +143,46 @@ func TblFromBank(bankFile *ALBankFile) []byte {
 	}
 
 	return result
+}
+
+func (inst *ALInstrument) CorrectOverlap() {
+	if inst == nil {
+		return
+	}
+
+	for upperIndex := 0; upperIndex < len(inst.SoundArray); upperIndex++ {
+		for lowerIndex := 0; lowerIndex < upperIndex; lowerIndex++ {
+			var a = inst.SoundArray[upperIndex].KeyMap
+			var b = inst.SoundArray[lowerIndex].KeyMap
+
+			if a.KeyMax >= b.KeyMin && a.KeyMax <= b.KeyMax {
+				fmt.Printf("Before %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
+				a.KeyMax = b.KeyMin - 1
+				fmt.Printf("After %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
+			}
+
+			if a.KeyMin >= b.KeyMin && a.KeyMin <= b.KeyMin {
+				fmt.Printf("Before %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
+				a.KeyMin = b.KeyMax + 1
+				fmt.Printf("After %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
+			}
+
+			if b.KeyMax >= a.KeyMin && b.KeyMax <= a.KeyMax {
+				b.KeyMax = a.KeyMin - 1
+			}
+
+			if b.KeyMin >= a.KeyMin && b.KeyMin <= a.KeyMin {
+				b.KeyMin = a.KeyMax + 1
+			}
+		}
+	}
+}
+
+func (bankFile *ALBankFile) CorrectOverlap() {
+	for _, bank := range bankFile.BankArray {
+		// bank.Percussion.CorrectOverlap()
+		for _, inst := range bank.InstArray {
+			inst.CorrectOverlap()
+		}
+	}
 }
