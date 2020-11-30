@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -44,18 +43,88 @@ type SFZConvertArgs struct {
 func ParseSFZConvertArgs(args map[string]string) (*SFZConvertArgs, error) {
 	var result SFZConvertArgs
 
-	for name, value := range args {
-		if name == "-s" || name == "--sample" {
-			sampleRate, err := strconv.ParseInt(value, 10, 32)
+	sampleRateString, ok := args["--sample-rate"]
 
-			if err != nil {
-				return nil, err
-			}
+	if ok {
+		sampleRate, err := strconv.ParseInt(sampleRateString, 10, 32)
 
-			result.TargetSampleRate = int(sampleRate)
-		} else {
-			return nil, errors.New("Unrecognized input " + name)
+		if err != nil {
+			return nil, err
 		}
+
+		result.TargetSampleRate = int(sampleRate)
+		delete(args, "--sample-rate")
+	}
+
+	return &result, nil
+}
+
+func ParseCompressionSettings(args map[string]string) (*adpcm.CompressionSettings, error) {
+	var result adpcm.CompressionSettings = adpcm.DefaultCompressionSettings()
+
+	orderString, ok := args["--order"]
+
+	if ok {
+		order, err := strconv.ParseInt(orderString, 10, 32)
+
+		if err != nil {
+			return nil, err
+		}
+
+		result.Order = int(order)
+		delete(args, "--order")
+	}
+
+	frameSizeString, ok := args["--frame-size"]
+
+	if ok {
+		frameSize, err := strconv.ParseInt(frameSizeString, 10, 32)
+
+		if err != nil {
+			return nil, err
+		}
+
+		result.FrameSize = int(frameSize)
+		delete(args, "--frame-size")
+	}
+
+	thresholdString, ok := args["--threshold"]
+
+	if ok {
+		threshold, err := strconv.ParseFloat(thresholdString, 64)
+
+		if err != nil {
+			return nil, err
+		}
+
+		result.Threshold = threshold
+		delete(args, "--threshold")
+	}
+
+	bitsString, ok := args["--bits"]
+
+	if ok {
+		bits, err := strconv.ParseInt(bitsString, 10, 32)
+
+		if err != nil {
+			return nil, err
+		}
+
+		result.Bits = int(bits)
+		delete(args, "--bits")
+	}
+
+	refineItersString, ok := args["--refine-iterations"]
+
+	if ok {
+		refineIters, err := strconv.ParseInt(refineItersString, 10, 32)
+
+		if err != nil {
+			return nil, err
+		}
+
+		result.RefineIters = int(refineIters)
+		delete(args, "--refine-iterations")
 	}
 
 	return &result, nil
@@ -192,7 +261,7 @@ func main() {
 			if outExt == ".sfz" {
 				err = convert.WriteSfzFile(insFile.BankFile, insFile.TblData, output)
 			} else if outExt == ".ctl" {
-				err = convert.WriteSfzFile(insFile.BankFile, insFile.TblData, output)
+				err = convert.WriteSoundBank(insFile.BankFile, insFile.TblData, output)
 			} else {
 				log.Fatal("Outut file should be of type .sfz or .ctl")
 			}
@@ -215,10 +284,15 @@ func main() {
 		if outExt == ".table" {
 			var codebook *adpcm.Codebook = nil
 			if sound.Wavetable.Type == al64.AL_RAW16_WAVE {
-				var compressionSettings = adpcm.DefaultCompressionSettings()
+				compressionSettings, err := ParseCompressionSettings(namedArgs)
+
+				if err != nil {
+					log.Fatal(err)
+				}
+
 				codebook, err = adpcm.CalculateCodebook(
 					audioconvert.DecodeSamples(sound.Wavetable.DataFromTable, binary.BigEndian),
-					&compressionSettings,
+					compressionSettings,
 				)
 
 				if err != nil {
@@ -237,11 +311,50 @@ func main() {
 			codebook.Serialize(outputFile)
 
 			fmt.Printf("Wrote table to %s", output)
+		} else if outExt == ".aifc" {
+			compressionSettings, err := ParseCompressionSettings(namedArgs)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			err = audioconvert.CompressWithSettings(sound.Wavetable, input, compressionSettings)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			err = audioconvert.WriteAifc(output, sound.Wavetable, sound.Wavetable.DataFromTable, sound.Wavetable.FileSampleRate)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if outExt == ".aif" || outExt == ".aiff" {
+			err = audioconvert.WriteAiff(output, sound.Wavetable, sound.Wavetable.DataFromTable, sound.Wavetable.FileSampleRate)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if outExt == ".wav" {
+			err = audioconvert.WriteWav(output, sound.Wavetable, sound.Wavetable.DataFromTable, sound.Wavetable.FileSampleRate)
 		} else {
-			fmt.Printf("Could not convert %s to %s", input, output)
+			fmt.Printf("Could not convert %s to %s\n", input, output)
 		}
 	} else if ext == ".sounds" {
-		err := convert.WriteSoundBank(input, orderedArgs[2:len(os.Args)])
+		shouldCompress, _ := namedArgs["--compress"]
+
+		var compressionSettings *adpcm.CompressionSettings
+
+		if shouldCompress == "true" {
+			var err error
+			compressionSettings, err = ParseCompressionSettings(namedArgs)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		err := convert.WriteSoundBank(input, orderedArgs[2:len(orderedArgs)], compressionSettings)
 
 		if err != nil {
 			log.Fatal(err)

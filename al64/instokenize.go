@@ -217,7 +217,7 @@ func tokenizeInst(characters []rune) []Token {
 		nextToken, state = state(character)
 
 		if nextToken != tokenTypeNone {
-			if nextToken != tokenTypeWhitespace {
+			if nextToken != tokenTypeWhitespace && nextToken != tokenTypeComment {
 				result = append(result, Token{
 					value: string(characters[start:curr]),
 					line:  line,

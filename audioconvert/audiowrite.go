@@ -26,6 +26,37 @@ func EnsureDirectory(filename string) error {
 	return nil
 }
 
+func ConvertCodebookToAL64(codebook *adpcm.Codebook) *al64.ALADPCMBook {
+	var result al64.ALADPCMBook
+
+	result.Order = int32(codebook.Order)
+	result.NPredictors = int32(len(codebook.Predictors))
+
+	result.Book = make([]int16, 8*result.Order*result.NPredictors)
+
+	var currIdx = 0
+
+	for pred := int32(0); pred < result.NPredictors; pred = pred + 1 {
+		for order := int32(0); order < result.Order; order = order + 1 {
+			for idx := 0; idx < 8; idx = idx + 1 {
+				var val = codebook.Predictors[pred].Table[idx][order]
+
+				if val > 0x7fff {
+					result.Book[currIdx] = 0x7fff
+				} else if val < -0x8000 {
+					result.Book[currIdx] = -0x8000
+				} else {
+					result.Book[currIdx] = int16(val)
+				}
+
+				currIdx = currIdx + 1
+			}
+		}
+	}
+
+	return &result
+}
+
 func ConvertCodebook(alType *al64.ALADPCMBook) *adpcm.Codebook {
 	var result adpcm.Codebook
 

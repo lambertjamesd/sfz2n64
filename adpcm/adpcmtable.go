@@ -54,7 +54,7 @@ func ParseCodebook(in io.Reader) (*Codebook, error) {
 	codebook.Order = int(order)
 	codebook.Predictors = make([]Predictor, npredictors)
 
-	if int(8*order*npredictors) != len(chunks)+2 {
+	if int(8*order*npredictors)+2 != len(chunks) {
 		return nil, errors.New(fmt.Sprintf(
 			"Wrong number of values for code book expected %d got %d",
 			int(8*order*npredictors),
@@ -65,9 +65,9 @@ func ParseCodebook(in io.Reader) (*Codebook, error) {
 	var inputIndex = 2
 
 	for predictor := 0; predictor < int(npredictors); predictor = predictor + 1 {
-		for i := 0; i < 8; i = i + 1 {
-			codebook.Predictors[predictor].Table[i] = make([]int32, order)
+		codebook.Predictors[predictor] = createPredictor(int(order))
 
+		for i := 0; i < 8; i = i + 1 {
 			for orderIndex := 0; orderIndex < int(order); orderIndex = orderIndex + 1 {
 				val, err := strconv.ParseInt(chunks[inputIndex], 10, 32)
 				inputIndex = inputIndex + 1
@@ -79,6 +79,8 @@ func ParseCodebook(in io.Reader) (*Codebook, error) {
 				codebook.Predictors[predictor].Table[i][orderIndex] = int32(val)
 			}
 		}
+
+		ExpandPredictor(&codebook.Predictors[predictor], int(order))
 	}
 
 	return &codebook, nil
@@ -88,7 +90,7 @@ func readPcm(pcmData []int16, start int, length int) []int16 {
 	var dataToRead = length
 
 	if start+length > len(pcmData) {
-		dataToRead = start + length - len(pcmData)
+		dataToRead = len(pcmData) - start
 	}
 
 	if dataToRead == 0 {
@@ -436,7 +438,7 @@ func buildPredictor(row []float64, order int) (Predictor, int) {
 	var result Predictor
 
 	for i := 0; i < PREDICTOR_SIZE; i++ {
-		result.Table[i] = make([]int32, order)
+		result.Table[i] = make([]int32, order+PREDICTOR_SIZE)
 	}
 
 	var table = make([][]float64, 8)
@@ -630,6 +632,8 @@ func CalculateCodebook(pcmData []int16, settings *CompressionSettings) (*Codeboo
 
 		numOverflows = numOverflows + overflows
 		result.Predictors = append(result.Predictors, predector)
+
+		ExpandPredictor(&result.Predictors[i], settings.Order)
 	}
 
 	if numOverflows > 0 {

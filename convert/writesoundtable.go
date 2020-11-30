@@ -3,11 +3,12 @@ package convert
 import (
 	"os"
 
+	"github.com/lambertjamesd/sfz2n64/adpcm"
 	"github.com/lambertjamesd/sfz2n64/al64"
 	"github.com/lambertjamesd/sfz2n64/audioconvert"
 )
 
-func WriteSoundBank(outputName string, inputSounds []string) error {
+func WriteSoundBank(outputName string, inputSounds []string, compressionSettings *adpcm.CompressionSettings) error {
 	var sounds []*al64.ALSound
 
 	for _, input := range inputSounds {
@@ -15,6 +16,14 @@ func WriteSoundBank(outputName string, inputSounds []string) error {
 
 		if err != nil {
 			return err
+		}
+
+		if compressionSettings != nil && sound.Wavetable.Type == al64.AL_RAW16_WAVE {
+			err = audioconvert.CompressWithSettings(sound.Wavetable, input, compressionSettings)
+
+			if err != nil {
+				return err
+			}
 		}
 
 		sounds = append(sounds, sound)

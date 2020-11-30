@@ -503,6 +503,8 @@ func EncodeADPCM(data *PCMEncodedData, codebook *Codebook, loop *Loop, truncate 
 
 		var frame = encodeFrame(frames, state, codebook)
 		result = append(result, *frame)
+
+		currentPos = currentPos + sampleCount
 	}
 
 	return &ADPCMEncodedData{
@@ -512,4 +514,22 @@ func EncodeADPCM(data *PCMEncodedData, codebook *Codebook, loop *Loop, truncate 
 		loop,
 		result,
 	}
+}
+
+func EnocdeFrames(frames []Frame) []byte {
+	var result = make([]byte, len(frames)*9)
+
+	for idx, frame := range frames {
+		result[idx+0] = frame.Header
+		result[idx+1] = frame.Data[0]
+		result[idx+2] = frame.Data[1]
+		result[idx+3] = frame.Data[2]
+		result[idx+4] = frame.Data[3]
+		result[idx+5] = frame.Data[4]
+		result[idx+6] = frame.Data[5]
+		result[idx+7] = frame.Data[6]
+		result[idx+8] = frame.Data[7]
+	}
+
+	return result
 }

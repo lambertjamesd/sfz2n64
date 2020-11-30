@@ -320,6 +320,46 @@ func parseSound(state *parseState) {
 				result.SamplePan = uint8(parseNumberValue(state, value, 0, 127))
 			} else if name.value == "volume" {
 				result.SampleVolume = uint8(parseNumberValue(state, value, 0, 127))
+			} else if name.value == "loopStart" {
+				if result.Wavetable == nil {
+					state.errors = append(state.errors, ParseError{
+						name,
+						"use attribute must come before loopStart attribute",
+						state.source,
+					})
+				} else {
+					if result.Wavetable.RawWave.Loop == nil {
+						result.Wavetable.RawWave.Loop = &ALRawLoop{0, 0, 0xffffffff}
+					}
+
+					var loopPos = parseNumberValue(state, value, 0, 0x7fffffff)
+
+					if loopPos < 0 {
+						loopPos = loopPos + int64(result.Wavetable.Len/2) + 1
+					}
+
+					result.Wavetable.RawWave.Loop.Start = uint32(loopPos)
+				}
+			} else if name.value == "loopEnd" {
+				if result.Wavetable == nil {
+					state.errors = append(state.errors, ParseError{
+						name,
+						"use attribute must come before loopEnd attribute",
+						state.source,
+					})
+				} else {
+					if result.Wavetable.RawWave.Loop == nil {
+						result.Wavetable.RawWave.Loop = &ALRawLoop{0, 0, 0xffffffff}
+					}
+
+					var loopPos = parseNumberValue(state, value, 0, 0x7fffffff)
+
+					if loopPos < 0 {
+						loopPos = loopPos + int64(result.Wavetable.Len/2) + 1
+					}
+
+					result.Wavetable.RawWave.Loop.End = uint32(loopPos)
+				}
 			} else if name.value == "keymap" {
 				state.link("keymap", value, func(structure structureType) bool {
 					asKeymap, ok := structure.(*ALKeyMap)
@@ -480,7 +520,7 @@ func parseBank(state *parseState) {
 
 					return ok
 				})
-			} else if name.value == "program" {
+			} else if name.value == "instrument" {
 				indexAsInt, err := strconv.ParseInt(index.value, 10, 8)
 
 				if err != nil || indexAsInt < 0 || indexAsInt > 127 {
