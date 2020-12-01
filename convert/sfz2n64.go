@@ -104,7 +104,7 @@ func sfzParseKeyMap(region *sfz.SfzFullRegion) (*al64.ALKeyMap, error) {
 	if tune == "" {
 		keyMap.Detune = 0
 	} else {
-		detune, err := strconv.ParseInt(pitch_keycenter, 10, 32)
+		detune, err := strconv.ParseInt(tune, 10, 32)
 
 		if err != nil {
 			return nil, err
