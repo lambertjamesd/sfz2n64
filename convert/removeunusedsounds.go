@@ -1,6 +1,11 @@
 package convert
 
 import (
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/lambertjamesd/sfz2n64/al64"
 	"github.com/lambertjamesd/sfz2n64/midi"
 )
@@ -99,4 +104,55 @@ func RemoveUnusedSounds(bank *al64.ALBank, seqArray []*midi.Midi) *al64.ALBank {
 	}
 
 	return &result
+}
+
+func ParseBankUsageFile(bankUsage string) ([][]*midi.Midi, error) {
+	textData, err := ioutil.ReadFile(bankUsage)
+
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(textData), "\n")
+
+	var currBank = 0
+
+	var result [][]*midi.Midi = nil
+
+	for _, line := range lines {
+		var trimmed = strings.TrimSpace(line)
+
+		if trimmed == "" {
+			continue
+		}
+
+		asInt, err := strconv.ParseInt(trimmed, 10, 32)
+
+		if err == nil {
+			currBank = int(asInt)
+			continue
+		}
+
+		midFile, err := os.Open(trimmed)
+
+		if err != nil {
+			return nil, err
+		}
+
+		defer midFile.Close()
+
+		midi, err := midi.ReadMidi(midFile)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for currBank >= len(result) {
+			result = append(result, nil)
+		}
+
+		result[currBank] = append(result[currBank], midi)
+	}
+
+	return result, nil
 }

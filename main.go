@@ -38,10 +38,11 @@ func ParseArgs(args []string) (map[string]string, []string) {
 }
 
 type SFZConvertArgs struct {
-	TargetSampleRate int
+	TargetSampleRate    int
+	BankSequenceMapping string
 }
 
-func ParseSFZConvertArgs(args map[string]string) (*SFZConvertArgs, error) {
+func ParseBankConvertArgs(args map[string]string) (*SFZConvertArgs, error) {
 	var result SFZConvertArgs
 
 	sampleRateString, ok := args["--sample-rate"]
@@ -55,6 +56,12 @@ func ParseSFZConvertArgs(args map[string]string) (*SFZConvertArgs, error) {
 
 		result.TargetSampleRate = int(sampleRate)
 		delete(args, "--sample-rate")
+	}
+
+	bankSequenceMapping, ok := args["--bank_sequence_mapping"]
+
+	if ok {
+		result.BankSequenceMapping = bankSequenceMapping
 	}
 
 	return &result, nil
@@ -237,14 +244,7 @@ func writeBank(input string, output string, bankFile *al64.ALBankFile, tblData [
 func main() {
 	if len(os.Args) < 3 {
 		log.Fatal(`Usage
-	sfz2n64 input.sfz output.ins [-s --sample_rate sampleRate]
-	sfz2n64 input.sfz output.ctl [-s --sample_rate sampleRate]
-
-	sfz2n64 input.ctl output.ins
-	sfz2n64 input.ctl output.sfz
-
-	sfz2n64 input.ins output.sfz
-	sfz2n64 input.ins output.ctl
+	sfz2n64 input.sfz|input.ins|input.ctl output.sfz|output.ins|output.ctl [--sample_rate sampleRate] [--bank_sequence_mapping sequences.txt]
 `)
 	}
 
@@ -257,7 +257,7 @@ func main() {
 	var outExt = filepath.Ext(output)
 
 	if isBankFile(ext) && isBankFile(outExt) {
-		args, err := ParseSFZConvertArgs(namedArgs)
+		args, err := ParseBankConvertArgs(namedArgs)
 
 		if err != nil {
 			log.Fatal(err)
@@ -271,6 +271,18 @@ func main() {
 
 		if args.TargetSampleRate != 0 {
 			bankFile = audioconvert.ResampleBankFile(bankFile, args.TargetSampleRate)
+		}
+
+		if args.BankSequenceMapping != "" {
+			bankMapping, err := convert.ParseBankUsageFile(args.BankSequenceMapping)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			for i := 0; i < len(bankMapping) && i < len(bankFile.BankArray); i++ {
+				bankFile.BankArray[i] = convert.RemoveUnusedSounds(bankFile.BankArray[i], bankMapping[i])
+			}
 		}
 
 		err = writeBank(input, output, bankFile, tblData, isSingleInstrument)
