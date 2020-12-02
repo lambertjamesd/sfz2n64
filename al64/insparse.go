@@ -56,15 +56,32 @@ type parseSource struct {
 
 type WaveTableLoader func(filename string) (*ALWavetable, error)
 
+type itemTokenMapping struct {
+	nameToken         *Token
+	namedEntryMapping map[string]*Token
+}
+
+func createTokenMapping(nameToken *Token) *itemTokenMapping {
+	return &itemTokenMapping{
+		nameToken,
+		make(map[string]*Token),
+	}
+}
+
 type parseState struct {
-	source     *parseSource
-	tokens     []Token
-	current    int
-	result     *ParsedIns
-	inError    bool
-	errors     []ParseError
-	links      []deferredLink
-	waveLoader WaveTableLoader
+	source       *parseSource
+	tokens       []Token
+	current      int
+	result       *ParsedIns
+	inError      bool
+	errors       []ParseError
+	links        []deferredLink
+	waveLoader   WaveTableLoader
+	tokenMapping map[interface{}]*itemTokenMapping
+}
+
+func (state *parseState) createError(at *Token, message string) ParseError {
+	return ParseError{at, message, state.source}
 }
 
 type ParseError struct {
@@ -89,17 +106,21 @@ func (source *parseSource) sourceContext(at int) (string, int) {
 }
 
 func (err ParseError) Error() string {
-	contextString, col := err.source.sourceContext(err.Token.start)
+	if err.Token == nil {
+		return err.Message
+	} else {
+		contextString, col := err.source.sourceContext(err.Token.start)
 
-	return fmt.Sprintf(
-		"%s:%d:%d: %s\n%s\n%s^",
-		err.source.name,
-		int(err.Token.line+1),
-		int(col+1),
-		err.Message,
-		contextString,
-		strings.Repeat(" ", col),
-	)
+		return fmt.Sprintf(
+			"%s:%d:%d: %s\n%s\n%s^",
+			err.source.name,
+			int(err.Token.line+1),
+			int(col+1),
+			err.Message,
+			contextString,
+			strings.Repeat(" ", col),
+		)
+	}
 }
 
 const validStructureNames = "keymap, envelope, sound, instrument, or bank"
@@ -210,12 +231,16 @@ func parseEnvelope(state *parseState) {
 
 	var result ALEnvelope
 
+	var itemTokenMapping = createTokenMapping(instrumentName)
+	state.tokenMapping[&result] = itemTokenMapping
+
 	var parsing = true
 
 	for state.hasMore() && parsing {
 		name, value, _ := parseAttribute(state)
 
 		if name != nil {
+			itemTokenMapping.namedEntryMapping[name.value] = name
 			if name.value == "attackTime" {
 				result.AttackTime = int32(parseNumberValue(state, value, 0, 2147483647))
 			} else if name.value == "attackVolume" {
@@ -259,12 +284,16 @@ func parseKeymap(state *parseState) {
 
 	var result ALKeyMap
 
+	var itemTokenMapping = createTokenMapping(instrumentName)
+	state.tokenMapping[&result] = itemTokenMapping
+
 	var parsing = true
 
 	for state.hasMore() && parsing {
 		name, value, _ := parseAttribute(state)
 
 		if name != nil {
+			itemTokenMapping.namedEntryMapping[name.value] = name
 			if name.value == "velocityMin" {
 				result.VelocityMin = uint8(parseNumberValue(state, value, 0, 127))
 			} else if name.value == "velocityMax" {
@@ -310,12 +339,16 @@ func parseSound(state *parseState) {
 
 	var result ALSound
 
+	var itemTokenMapping = createTokenMapping(instrumentName)
+	state.tokenMapping[&result] = itemTokenMapping
+
 	var parsing = true
 
 	for state.hasMore() && parsing {
 		name, value, _ := parseAttribute(state)
 
 		if name != nil {
+			itemTokenMapping.namedEntryMapping[name.value] = name
 			if name.value == "pan" {
 				result.SamplePan = uint8(parseNumberValue(state, value, 0, 127))
 			} else if name.value == "volume" {
@@ -429,12 +462,16 @@ func parseInstrument(state *parseState) {
 
 	var result ALInstrument
 
+	var itemTokenMapping = createTokenMapping(instrumentName)
+	state.tokenMapping[&result] = itemTokenMapping
+
 	var parsing = true
 
 	for state.hasMore() && parsing {
 		name, value, _ := parseAttribute(state)
 
 		if name != nil {
+			itemTokenMapping.namedEntryMapping[name.value] = name
 			if name.value == "volume" {
 				result.Volume = uint8(parseNumberValue(state, value, 0, 127))
 			} else if name.value == "pan" {
@@ -625,6 +662,7 @@ func ParseIns(input string, inputName string, loader WaveTableLoader) (*ParsedIn
 		nil,
 		nil,
 		loader,
+		make(map[interface{}]*itemTokenMapping),
 	}
 
 	parseFile(&state)
@@ -649,8 +687,10 @@ func ParseIns(input string, inputName string, loader WaveTableLoader) (*ParsedIn
 		}
 	}
 
+	var validationErrors = validateIns(state.result.BankFile, &state)
+
 	_, tblData := state.result.BankFile.LayoutTbl(0, nil)
 	state.result.TblData = tblData
 
-	return state.result, state.errors
+	return state.result, append(state.errors, validationErrors...)
 }
