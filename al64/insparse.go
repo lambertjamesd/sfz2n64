@@ -365,7 +365,7 @@ func parseSound(state *parseState) {
 						result.Wavetable.RawWave.Loop = &ALRawLoop{0, 0, 0xffffffff}
 					}
 
-					var loopPos = parseNumberValue(state, value, 0, 0x7fffffff)
+					var loopPos = parseNumberValue(state, value, -0x80000000, 0x7fffffff)
 
 					if loopPos < 0 {
 						loopPos = loopPos + int64(result.Wavetable.Len/2) + 1

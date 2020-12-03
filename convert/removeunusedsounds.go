@@ -3,6 +3,7 @@ package convert
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -40,7 +41,7 @@ func getUsedInstrument(bank *al64.ALBank, instrumentNumber int, key uint8, veloc
 func markUsedSounds(bank *al64.ALBank, seqArray []*midi.Midi, into map[interface{}]bool) {
 	var programs [16]int
 
-	programs[10] = percussionChannel
+	programs[9] = percussionChannel
 
 	for _, seq := range seqArray {
 		for _, track := range seq.Tracks {
@@ -89,7 +90,7 @@ func RemoveUnusedSounds(bank *al64.ALBank, seqArray []*midi.Midi) *al64.ALBank {
 		_, instrumentUsed := used[bank.Percussion]
 
 		if instrumentUsed {
-			result.Percussion = removeUnusedSoundsFromInstrument(result.Percussion, used)
+			result.Percussion = removeUnusedSoundsFromInstrument(bank.Percussion, used)
 		}
 	}
 
@@ -133,7 +134,7 @@ func ParseBankUsageFile(bankUsage string) ([][]*midi.Midi, error) {
 			continue
 		}
 
-		midFile, err := os.Open(trimmed)
+		midFile, err := os.Open(filepath.Join(filepath.Dir(bankUsage), trimmed))
 
 		if err != nil {
 			return nil, err

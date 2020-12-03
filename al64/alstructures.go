@@ -1,7 +1,5 @@
 package al64
 
-import "fmt"
-
 type ALWaveType uint8
 
 const (
@@ -156,15 +154,11 @@ func (inst *ALInstrument) CorrectOverlap() {
 			var b = inst.SoundArray[lowerIndex].KeyMap
 
 			if a.KeyMax >= b.KeyMin && a.KeyMax <= b.KeyMax {
-				fmt.Printf("Before %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
 				a.KeyMax = b.KeyMin - 1
-				fmt.Printf("After %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
 			}
 
 			if a.KeyMin >= b.KeyMin && a.KeyMin <= b.KeyMin {
-				fmt.Printf("Before %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
 				a.KeyMin = b.KeyMax + 1
-				fmt.Printf("After %d-%d, %d-%d", a.KeyMin, a.KeyMax, b.KeyMin, b.KeyMax)
 			}
 
 			if b.KeyMax >= a.KeyMin && b.KeyMax <= a.KeyMax {
