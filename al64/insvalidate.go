@@ -27,7 +27,11 @@ func getToken(parseState *parseState, item interface{}, tokens []string) (*Token
 	return instrumentMapping.nameToken, instrumentMapping.nameToken.value
 }
 
-func validateInstruments(instrument *ALInstrument, parseState *parseState, errors []ParseError) []ParseError {
+func validateInstrument(instrument *ALInstrument, parseState *parseState, errors []ParseError) []ParseError {
+	if instrument == nil {
+		return errors
+	}
+
 	for index, firstSound := range instrument.SoundArray {
 		for secondIndex := 0; secondIndex < index; secondIndex++ {
 			var secondSound = instrument.SoundArray[secondIndex]
@@ -47,8 +51,8 @@ func validateInstruments(instrument *ALInstrument, parseState *parseState, error
 				secondSound.KeyMap.VelocityMin,
 				secondSound.KeyMap.VelocityMax,
 			) {
-				firstSoundLocation, soundName := getToken(parseState, firstSound, []string{"keyMin", "keyMax"})
-				secondSoundLocation, secondSoundName := getToken(parseState, secondSound, []string{"keyMin", "keyMax"})
+				firstSoundLocation, soundName := getToken(parseState, firstSound.KeyMap, []string{"keyMin", "keyMax"})
+				secondSoundLocation, secondSoundName := getToken(parseState, secondSound.KeyMap, []string{"keyMin", "keyMax"})
 				errors = append(errors, parseState.createError(firstSoundLocation, fmt.Sprintf("keyMin and keyMax overlap in %s", soundName)))
 				errors = append(errors, parseState.createError(secondSoundLocation, fmt.Sprintf("with keyMin and keyMax overlap in %s", secondSoundName)))
 			}
@@ -64,6 +68,14 @@ func validateIns(bankFile *ALBankFile, parseState *parseState) []ParseError {
 	}
 
 	var result []ParseError = nil
+
+	for _, bank := range bankFile.BankArray {
+		result = validateInstrument(bank.Percussion, parseState, result)
+
+		for _, inst := range bank.InstArray {
+			result = validateInstrument(inst, parseState, result)
+		}
+	}
 
 	return result
 }
