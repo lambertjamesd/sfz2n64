@@ -78,14 +78,15 @@ func iabs(x int32) int32 {
 }
 
 func qsample(x float32, scale int32) int16 {
+	var scaled = x / float32(scale)
 	if x > 0 {
-		return int16((x / float32(scale)) + 0.4999999)
+		return int16(scaled + 0.4999999)
 	} else {
-		return int16((x / float32(scale)) - 0.4999999)
+		return int16(scaled - 0.4999999)
 	}
 }
 
-func clamp(fs int32, e [16]float32, ie [16]int32, bits int32) {
+func clamp(fs int32, e *[16]float32, ie *[16]int32, bits int32) {
 	var lowerLevel = 1 << (bits - 1)
 	var llevel = -float32(lowerLevel)
 	var ulevel = -llevel - 1
@@ -233,7 +234,7 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook) *Frame {
 	}
 
 	// Clamp the errors to 16-bit signed ints, and put them in ie.
-	clamp(16, e, ie, 16)
+	clamp(16, &e, &ie, 16)
 
 	// Find a value with highest absolute value.
 	// @bug If this first finds -2^n and later 2^n, it should set 'max' to the
@@ -248,7 +249,7 @@ func encodeFrame(input []int16, state []int32, codebook *Codebook) *Frame {
 	// Compute which power of two we need to scale down by in order to make
 	// all values representable as 4-bit signed integers (i.e. be in [-8, 7]).
 	// The worst-case 'max' is -2^15, so this will be at most 12.
-	for scale := 0; scale <= 12; scale = scale + 1 {
+	for scale = 0; scale <= 12; scale = scale + 1 {
 		if max <= ulevel && max >= llevel {
 			break
 		}

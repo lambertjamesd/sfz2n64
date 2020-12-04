@@ -67,8 +67,8 @@ func ParseCodebook(in io.Reader) (*Codebook, error) {
 	for predictor := 0; predictor < int(npredictors); predictor = predictor + 1 {
 		codebook.Predictors[predictor] = createPredictor(int(order))
 
-		for i := 0; i < 8; i = i + 1 {
-			for orderIndex := 0; orderIndex < int(order); orderIndex = orderIndex + 1 {
+		for orderIndex := 0; orderIndex < int(order); orderIndex = orderIndex + 1 {
+			for i := 0; i < 8; i = i + 1 {
 				val, err := strconv.ParseInt(chunks[inputIndex], 10, 32)
 				inputIndex = inputIndex + 1
 
