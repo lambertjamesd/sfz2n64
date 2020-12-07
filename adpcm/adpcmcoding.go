@@ -520,7 +520,9 @@ func EncodeADPCM(data *PCMEncodedData, codebook *Codebook, loop *Loop, truncate 
 func EnocdeFrames(frames []Frame) []byte {
 	var result = make([]byte, len(frames)*9)
 
-	for idx, frame := range frames {
+	var idx = 0
+
+	for _, frame := range frames {
 		result[idx+0] = frame.Header
 		result[idx+1] = frame.Data[0]
 		result[idx+2] = frame.Data[1]
@@ -530,6 +532,8 @@ func EnocdeFrames(frames []Frame) []byte {
 		result[idx+6] = frame.Data[5]
 		result[idx+7] = frame.Data[6]
 		result[idx+8] = frame.Data[7]
+
+		idx += 9
 	}
 
 	return result
