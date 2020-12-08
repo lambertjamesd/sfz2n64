@@ -3,6 +3,7 @@ package al64
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 )
 
@@ -17,7 +18,21 @@ type SeekableReader interface {
 	Seek(offset int64, whence int) (ret int64, err error)
 }
 
+// arbitrary max ctl file size used to filter out bad addresses
+const maxOffset = 500 * 1024
+
+const maxBankCount = 128
+const maxInstrumentCount = 256
+const maxSoundCount = 256
+
+const minSampleRate = 8000
+const maxSampleRate = 96000
+
 func readTypeAt(state *alParseState, reader SeekableReader, address int32, parser alTypeParser) (interface{}, error) {
+	if address > maxOffset {
+		return nil, errors.New(fmt.Sprintf("Could not read address of %d", address))
+	}
+
 	result, exists := state.parsed[address]
 
 	if exists {
@@ -239,7 +254,7 @@ func readSound(state *alParseState, reader SeekableReader, address int32) (inter
 	keyMap, didCast := interfaceCheck.(*ALKeyMap)
 
 	if !didCast {
-		return nil, errors.New("Expected *ALEnvelope")
+		return nil, errors.New("Expected *ALKeyMap")
 	}
 
 	result.KeyMap = keyMap
@@ -274,7 +289,17 @@ func readInstrument(state *alParseState, reader SeekableReader, address int32) (
 	var result ALInstrument
 
 	binary.Read(reader, binary.BigEndian, &result.Volume)
+
+	if result.Volume >= 128 {
+		return nil, errors.New("Invalid value for volume")
+	}
+
 	binary.Read(reader, binary.BigEndian, &result.Pan)
+
+	if result.Pan >= 128 {
+		return nil, errors.New("Invalid value for pan")
+	}
+
 	binary.Read(reader, binary.BigEndian, &result.Priority)
 	var flags uint8
 	binary.Read(reader, binary.BigEndian, &flags)
@@ -292,6 +317,10 @@ func readInstrument(state *alParseState, reader SeekableReader, address int32) (
 	binary.Read(reader, binary.BigEndian, &result.BendRange)
 	var soundCount int16
 	binary.Read(reader, binary.BigEndian, &soundCount)
+
+	if soundCount < 0 || soundCount > maxSoundCount {
+		return nil, errors.New("Invalid sound count")
+	}
 
 	result.SoundArray = make([]*ALSound, soundCount)
 
@@ -324,11 +353,24 @@ func readInstrument(state *alParseState, reader SeekableReader, address int32) (
 func readBank(state *alParseState, reader SeekableReader, address int32) (interface{}, error) {
 	var instrumentCount int16
 	binary.Read(reader, binary.BigEndian, &instrumentCount)
+
+	if instrumentCount < 0 || instrumentCount > maxInstrumentCount {
+		return nil, errors.New("Invalid number of instruments")
+	}
+
 	var padding uint16
 	binary.Read(reader, binary.BigEndian, &padding)
 
+	if padding != 0 {
+		return nil, errors.New("Invalid padding")
+	}
+
 	var result ALBank
 	binary.Read(reader, binary.BigEndian, &result.SampleRate)
+
+	if result.SampleRate < minSampleRate || result.SampleRate > maxSampleRate {
+		return nil, errors.New("Invalid sample rate")
+	}
 
 	var perucssion int32
 	binary.Read(reader, binary.BigEndian, &perucssion)
@@ -357,23 +399,24 @@ func readBank(state *alParseState, reader SeekableReader, address int32) (interf
 		var instrumentOffset int32
 		binary.Read(reader, binary.BigEndian, &instrumentOffset)
 
-		if instrumentOffset == 0 {
-			return nil, errors.New("Null Instrument")
+		if instrumentOffset != 0 {
+			bankInt, err := readTypeAt(state, reader, instrumentOffset, readInstrument)
+
+			if err != nil {
+				return nil, err
+			}
+
+			inst, didCast := bankInt.(*ALInstrument)
+
+			if !didCast {
+				return nil, errors.New("Expected ALInstrument")
+			}
+
+			result.InstArray[i] = inst
+		} else {
+			result.InstArray = append(result.InstArray, nil)
 		}
 
-		bankInt, err := readTypeAt(state, reader, instrumentOffset, readInstrument)
-
-		if err != nil {
-			return nil, err
-		}
-
-		inst, didCast := bankInt.(*ALInstrument)
-
-		if !didCast {
-			return nil, errors.New("Expected ALInstrument")
-		}
-
-		result.InstArray[i] = inst
 	}
 
 	return &result, nil
@@ -395,6 +438,10 @@ func readBankFile(state *alParseState, reader SeekableReader, address int32) (in
 
 	var bankCount int16
 	binary.Read(reader, binary.BigEndian, &bankCount)
+
+	if bankCount < 0 || bankCount > maxBankCount {
+		return nil, errors.New(fmt.Sprintf("Invalid value for bankCount %d", bankCount))
+	}
 
 	result.BankArray = make([]*ALBank, bankCount)
 

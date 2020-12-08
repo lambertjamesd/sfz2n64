@@ -14,6 +14,7 @@ import (
 	"github.com/lambertjamesd/sfz2n64/al64"
 	"github.com/lambertjamesd/sfz2n64/audioconvert"
 	"github.com/lambertjamesd/sfz2n64/convert"
+	"github.com/lambertjamesd/sfz2n64/romextractor"
 	"github.com/lambertjamesd/sfz2n64/sfz"
 )
 
@@ -142,6 +143,10 @@ func isBankFile(ext string) bool {
 	return ext == ".sfz" || ext == ".ctl" || ext == ".ins"
 }
 
+func isRomFile(ext string) bool {
+	return ext == ".n64" || ext == ".z64" || ext == ".v64"
+}
+
 func parseInputBank(input string) (*al64.ALBankFile, []byte, bool, error) {
 	var ext = filepath.Ext(input)
 
@@ -256,7 +261,15 @@ func main() {
 	var output = orderedArgs[2]
 	var outExt = filepath.Ext(output)
 
-	if isBankFile(ext) && isBankFile(outExt) {
+	if isRomFile(ext) {
+		banks, err := romextractor.FindBanksInFile(input)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Println(fmt.Sprintf("Found banks %d", len(banks)))
+	} else if isBankFile(ext) && isBankFile(outExt) {
 		args, err := ParseBankConvertArgs(namedArgs)
 
 		if err != nil {
