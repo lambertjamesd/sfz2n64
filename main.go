@@ -262,13 +262,34 @@ func main() {
 	var outExt = filepath.Ext(output)
 
 	if isRomFile(ext) {
-		banks, err := romextractor.FindBanksInFile(input)
+		data, err := ioutil.ReadFile(input)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		log.Println(fmt.Sprintf("Found banks %d", len(banks)))
+		romextractor.CorrectByteswap(data)
+
+		banks := romextractor.FindBanks(data)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var finalBanks []*al64.ALBankWithTable = nil
+
+		for _, bank := range banks {
+			tblOffset, tblLen, err := romextractor.FindTbl(bank, data)
+
+			if err == nil {
+				finalBanks = append(finalBanks, &al64.ALBankWithTable{
+					Bank: bank,
+					Tbl:  data[tblOffset : tblOffset+tblLen],
+				})
+			}
+		}
+
+		log.Println(fmt.Sprintf("Found banks %d", len(finalBanks)))
 	} else if isBankFile(ext) && isBankFile(outExt) {
 		args, err := ParseBankConvertArgs(namedArgs)
 

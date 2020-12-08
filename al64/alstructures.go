@@ -113,6 +113,11 @@ type ALBankFile struct {
 	BankArray []*ALBank
 }
 
+type ALBankWithTable struct {
+	Bank *ALBankFile
+	Tbl  []byte
+}
+
 func TblFromBank(bankFile *ALBankFile) []byte {
 	var result []byte = nil
 	var base int32 = 0
