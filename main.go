@@ -218,7 +218,7 @@ func parseInputBank(input string) (*al64.ALBankFile, []byte, bool, error) {
 		bankFile = instFile.BankFile
 		tblData = instFile.TblData
 	} else {
-		return nil, nil, false, errors.New("Could not handle inptu file type")
+		return nil, nil, false, errors.New("Could not handle input file type")
 	}
 
 	return bankFile, tblData, isSingleInstrument, nil
@@ -372,10 +372,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		if args.TargetSampleRate != 0 {
-			bankFile = audioconvert.ResampleBankFile(bankFile, args.TargetSampleRate)
-		}
-
 		if args.BankSequenceMapping != "" {
 			bankMapping, err := convert.ParseBankUsageFile(args.BankSequenceMapping)
 
@@ -386,6 +382,10 @@ func main() {
 			for i := 0; i < len(bankMapping) && i < len(bankFile.BankArray); i++ {
 				bankFile.BankArray[i] = convert.RemoveUnusedSounds(bankFile.BankArray[i], bankMapping[i])
 			}
+		}
+
+		if args.TargetSampleRate != 0 {
+			bankFile = audioconvert.ResampleBankFile(bankFile, args.TargetSampleRate)
 		}
 
 		err = writeBank(input, output, bankFile, tblData, isSingleInstrument)
@@ -484,7 +484,32 @@ func main() {
 		}
 
 		log.Println("Wrote sound array to " + input)
+	} else if ext == ".mid" && isBankFile(outExt) {
+		midFile, err := os.Open(input)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer midFile.Close()
+
+		midi, err := midi.ReadMidi(midFile)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		bankFile, _, _, err := parseInputBank(output)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var maxActiveNotes = convert.SimplifyMidi(midi, bankFile.BankArray[0], 20)
+
+		log.Println(fmt.Sprintf("Max number of active notes %d\n", maxActiveNotes))
+
 	} else {
-		log.Fatal(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file", input))
+		log.Fatal(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file\n", input))
 	}
 }

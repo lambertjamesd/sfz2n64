@@ -385,13 +385,29 @@ func parseSound(state *parseState) {
 						result.Wavetable.RawWave.Loop = &ALRawLoop{0, 0, 0xffffffff}
 					}
 
-					var loopPos = parseNumberValue(state, value, 0, 0x7fffffff)
+					var loopPos = parseNumberValue(state, value, -0x80000000, 0x7fffffff)
 
 					if loopPos < 0 {
 						loopPos = loopPos + int64(result.Wavetable.Len/2) + 1
 					}
 
 					result.Wavetable.RawWave.Loop.End = uint32(loopPos)
+				}
+			} else if name.value == "loopCount" {
+				if result.Wavetable == nil {
+					state.errors = append(state.errors, ParseError{
+						name,
+						"use attribute must come before loopCount attribute",
+						state.source,
+					})
+				} else {
+					if result.Wavetable.RawWave.Loop == nil {
+						result.Wavetable.RawWave.Loop = &ALRawLoop{0, 0, 0xffffffff}
+					}
+
+					var loopCount = parseNumberValue(state, value, -1, 0x7fffffff)
+
+					result.Wavetable.RawWave.Loop.Count = uint32(loopCount)
 				}
 			} else if name.value == "keymap" {
 				state.link("keymap", value, func(structure structureType) bool {

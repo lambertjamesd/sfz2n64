@@ -86,6 +86,8 @@ func RemoveUnusedSounds(bank *al64.ALBank, seqArray []*midi.Midi) *al64.ALBank {
 
 	var result al64.ALBank
 
+	result.SampleRate = bank.SampleRate
+
 	if bank.Percussion != nil {
 		_, instrumentUsed := used[bank.Percussion]
 
