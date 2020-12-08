@@ -59,8 +59,6 @@ func FindBanks(content []byte) []*al64.ALBankFile {
 
 	for i := 0; i < len(content); i++ {
 		if content[i] == 0x42 && content[i+1] == 0x31 && (i & ^7) == i {
-			// log.Println(fmt.Sprintf("Checking at offset %x\n", i))
-
 			var reader = OffsetByteReader{
 				content,
 				i,
@@ -70,10 +68,8 @@ func FindBanks(content []byte) []*al64.ALBankFile {
 			bankCheck, err := al64.ReadBankFile(&reader)
 
 			if err == nil {
-				log.Println(fmt.Sprintf("Found bank at offset %x\n", i))
+				log.Println(fmt.Sprintf("Found bank at offset %x", i))
 				result = append(result, bankCheck)
-			} else {
-				log.Println(err.Error())
 			}
 		}
 	}

@@ -22,8 +22,8 @@ type SeekableReader interface {
 const maxOffset = 500 * 1024
 
 const maxBankCount = 128
-const maxInstrumentCount = 256
-const maxSoundCount = 256
+const maxInstrumentCount = 2048
+const maxSoundCount = 2048
 
 const minSampleRate = 8000
 const maxSampleRate = 96000

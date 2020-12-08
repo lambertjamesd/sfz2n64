@@ -11,6 +11,7 @@ const FRAME_SIZE = 9
 
 type adpcmFinder struct {
 	npredictors    int
+	offset         int
 	dataLength     int
 	frameBlacklist [FRAME_SIZE]int
 }
@@ -47,7 +48,7 @@ func (finder *adpcmFinder) findPossibleADPCMLocations(in []byte) map[int]bool {
 		var beginningCheck = i - finder.dataLength
 
 		if finder.frameBlacklist[blackListCheck] == 0 && (beginningCheck & ^0x7) == beginningCheck {
-			result[i] = true
+			result[beginningCheck-finder.offset] = true
 		}
 
 		if i < len(in) {
@@ -77,6 +78,7 @@ func (finder *adpcmFinder) findPossibleADPCMLocations(in []byte) map[int]bool {
 func findPossibleLocations(wavetable *al64.ALWavetable, in []byte) map[int]bool {
 	var finder = adpcmFinder{
 		int(wavetable.AdpcWave.Book.NPredictors),
+		int(wavetable.Base),
 		int(wavetable.Len),
 		[FRAME_SIZE]int{},
 	}
@@ -105,7 +107,6 @@ func FindTblWithTables(wavetables WavetableList, in []byte) (int, error) {
 
 	sort.Sort(wavetables)
 
-	var relativeOffset = wavetables[0].Base
 	var possibleLocations = findPossibleLocations(wavetables[0], in)
 
 	for i := 1; i < len(wavetables); i++ {
@@ -113,17 +114,16 @@ func FindTblWithTables(wavetables WavetableList, in []byte) (int, error) {
 			break
 		} else if len(possibleLocations) == 1 {
 			for index, _ := range possibleLocations {
-				return index - int(relativeOffset), nil
+				return index, nil
 			}
 		}
 
 		var otherSoundLocations = findPossibleLocations(wavetables[i], in)
 
 		var nextPossibleLocations = make(map[int]bool)
-		var offsetDifference = wavetables[i].Base - relativeOffset
 
 		for index, _ := range possibleLocations {
-			isPossibleInOther, _ := otherSoundLocations[index+int(offsetDifference)]
+			isPossibleInOther, _ := otherSoundLocations[index]
 
 			if isPossibleInOther {
 				nextPossibleLocations[index] = true

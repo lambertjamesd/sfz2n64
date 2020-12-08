@@ -118,34 +118,62 @@ type ALBankWithTable struct {
 	Tbl  []byte
 }
 
+func tblFromInstrument(inst *ALInstrument, base int32, result []byte) (int32, []byte) {
+	if inst != nil {
+		for _, sound := range inst.SoundArray {
+			if sound != nil && sound.Wavetable != nil {
+				var padding = ((base + 0xf) & ^0xf) - base
+
+				if padding != 0 {
+					base = base + padding
+					result = append(result, make([]byte, padding)...)
+				}
+
+				sound.Wavetable.Base = base
+				sound.Wavetable.Len = int32(len(sound.Wavetable.DataFromTable))
+				base += sound.Wavetable.Len
+
+				result = append(result, sound.Wavetable.DataFromTable...)
+			}
+		}
+	}
+
+	return base, result
+}
+
 func TblFromBank(bankFile *ALBankFile) []byte {
 	var result []byte = nil
 	var base int32 = 0
 
 	for _, bank := range bankFile.BankArray {
+		base, result = tblFromInstrument(bank.Percussion, base, result)
 		for _, inst := range bank.InstArray {
-			if inst != nil {
-				for _, sound := range inst.SoundArray {
-					if sound != nil && sound.Wavetable != nil {
-						var padding = ((base + 0xf) & ^0xf) - base
-
-						if padding != 0 {
-							base = base + padding
-							result = append(result, make([]byte, padding)...)
-						}
-
-						sound.Wavetable.Base = base
-						sound.Wavetable.Len = int32(len(sound.Wavetable.DataFromTable))
-						base += sound.Wavetable.Len
-
-						result = append(result, sound.Wavetable.DataFromTable...)
-					}
-				}
-			}
+			base, result = tblFromInstrument(inst, base, result)
 		}
 	}
 
 	return result
+}
+
+func writeTblIntoInstrument(inst *ALInstrument, sampleRate uint32, tbl []byte) {
+	if inst != nil {
+		for _, sound := range inst.SoundArray {
+			if sound != nil && sound.Wavetable != nil {
+				sound.Wavetable.FileSampleRate = sampleRate
+				sound.Wavetable.DataFromTable = tbl[sound.Wavetable.Base : sound.Wavetable.Base+sound.Wavetable.Len]
+			}
+		}
+	}
+}
+
+func WriteTlbIntoBank(bankFile *ALBankFile, tbl []byte) {
+	for _, bank := range bankFile.BankArray {
+		writeTblIntoInstrument(bank.Percussion, bank.SampleRate, tbl)
+		for _, inst := range bank.InstArray {
+			writeTblIntoInstrument(inst, bank.SampleRate, tbl)
+		}
+	}
+
 }
 
 func (inst *ALInstrument) CorrectOverlap() {

@@ -21,6 +21,8 @@ type insConversionState struct {
 func (state *insConversionState) getInstrumentName(index int) string {
 	if index < len(state.instrumentNames) {
 		return state.instrumentNames[index]
+	} else if index >= len(MIDINames) {
+		return fmt.Sprintf("Instrument_%d", index)
 	} else {
 		return MIDINames[index]
 	}
