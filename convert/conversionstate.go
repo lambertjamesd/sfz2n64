@@ -22,9 +22,9 @@ func (state *insConversionState) getInstrumentName(index int) string {
 	if index < len(state.instrumentNames) {
 		return state.instrumentNames[index]
 	} else if index >= len(MIDINames) {
-		return fmt.Sprintf("Instrument_%d", index)
+		return fmt.Sprintf("%03d_Instrument", index)
 	} else {
-		return MIDINames[index]
+		return fmt.Sprintf("%03d_%s", index, MIDINames[index])
 	}
 }
 

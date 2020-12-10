@@ -386,6 +386,7 @@ func main() {
 
 		if args.TargetSampleRate != 0 {
 			bankFile = audioconvert.ResampleBankFile(bankFile, args.TargetSampleRate)
+			tblData = al64.TblFromBank(bankFile)
 		}
 
 		err = writeBank(input, output, bankFile, tblData, isSingleInstrument)

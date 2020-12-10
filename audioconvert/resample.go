@@ -2,9 +2,19 @@ package audioconvert
 
 import (
 	"encoding/binary"
+	"math"
 
 	"github.com/lambertjamesd/sfz2n64/al64"
 )
+
+func ConvertSampleLocation(location int, to int, from int) int {
+	var result = float64(location)*float64(to)/float64(from) + 0.5
+	return int(math.Floor(result))
+}
+
+func lerpSample(a int16, b int16, lerp float32) int16 {
+	return (int16)(float32(a)*(1-lerp) + float32(b)*lerp)
+}
 
 func GetSample(input []int16, at float32) int16 {
 	var asInt = int(at)
@@ -19,17 +29,47 @@ func GetSample(input []int16, at float32) int16 {
 
 		var lerpValue = at - float32(asInt)
 
-		return (int16)(float32(currentSample)*(1-lerpValue) + float32(nextSample)*lerpValue)
+		return lerpSample(currentSample, nextSample, lerpValue)
 	}
 }
 
 func Resample(input []int16, from int, to int) []int16 {
-	var result []int16 = make([]int16, len(input)*to/from)
+	var result []int16 = make([]int16, ConvertSampleLocation(len(input), to, from))
 
 	var scale = float32(from) / float32(to)
 
 	for index, _ := range result {
 		result[index] = GetSample(input, float32(index)*scale)
+	}
+
+	return result
+}
+
+func ResampleLooped(input []int16, from int, to int, loopStart int, loopEnd int) []int16 {
+	var result []int16 = make([]int16, ConvertSampleLocation(len(input), to, from))
+	var scale = float32(from) / float32(to)
+
+	var convertedStart = ConvertSampleLocation(loopStart, to, from)
+	var convertedEnd = ConvertSampleLocation(loopEnd, to, from)
+
+	// ensure that the first sample in the loop is accurate
+	var scaleOffset = float32(loopStart) - float32(convertedStart)*scale
+
+	for index := 0; index < convertedEnd && index < len(result); index++ {
+		result[index] = GetSample(input, float32(index)*scale+scaleOffset)
+	}
+
+	scaleOffset = float32(loopEnd) - float32(convertedEnd)*scale
+
+	for index := convertedStart; index < convertedEnd && index < len(result); index++ {
+		var lerp = float32(index-convertedStart) / float32(convertedEnd-1-convertedStart)
+
+		var inputSample = GetSample(input, float32(index)*scale+scaleOffset)
+		result[index] = lerpSample(result[index], inputSample, lerp)
+	}
+
+	for index := convertedEnd; index < len(result); index++ {
+		result[index] = GetSample(input, float32(index)*scale+scaleOffset)
 	}
 
 	return result
@@ -50,19 +90,23 @@ func ResampleWavetable(wavetable *al64.ALWavetable, to int, from int) *al64.ALWa
 	}
 
 	var samples = DecodeSamples(wavetable.DataFromTable, binary.BigEndian)
-	var resampled = Resample(samples, from, to)
+	var resampled []int16
 
 	if wavetable.RawWave.Loop != nil {
 		var loop al64.ALRawLoop
 
-		loop.Start = uint32(int(wavetable.RawWave.Loop.Start) * to / from)
-		loop.End = uint32(int(wavetable.RawWave.Loop.End) * to / from)
+		loop.Start = uint32(ConvertSampleLocation(int(wavetable.RawWave.Loop.Start), to, from))
+		loop.End = uint32(ConvertSampleLocation(int(wavetable.RawWave.Loop.End), to, from))
 		loop.Count = wavetable.RawWave.Loop.Count
 
+		resampled = ResampleLooped(samples, from, to, int(wavetable.RawWave.Loop.Start), int(wavetable.RawWave.Loop.End))
+
 		result.RawWave.Loop = &loop
+	} else {
+		resampled = Resample(samples, from, to)
 	}
 
-	result.Base = wavetable.Base
+	result.Base = 0
 	result.Len = int32(2 * len(resampled))
 	result.Type = wavetable.Type
 	result.DataFromTable = EncodeSamples(resampled, binary.BigEndian)
@@ -78,9 +122,9 @@ func ResampleEnvelope(envelope *al64.ALEnvelope, to int, from int) *al64.ALEnvel
 
 	var result al64.ALEnvelope
 
-	result.AttackTime = int32(int(envelope.AttackTime) * to / from)
-	result.DecayTime = int32(int(envelope.DecayTime) * to / from)
-	result.ReleaseTime = int32(int(envelope.ReleaseTime) * to / from)
+	result.AttackTime = int32(ConvertSampleLocation(int(envelope.AttackTime), to, from))
+	result.DecayTime = int32(ConvertSampleLocation(int(envelope.DecayTime), to, from))
+	result.ReleaseTime = int32(ConvertSampleLocation(int(envelope.ReleaseTime), to, from))
 	result.AttackVolume = envelope.AttackVolume
 	result.DecayVolume = envelope.DecayVolume
 

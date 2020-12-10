@@ -246,7 +246,7 @@ func parseEnvelope(state *parseState) {
 			} else if name.value == "attackVolume" {
 				result.AttackVolume = uint8(parseNumberValue(state, value, 0, 127))
 			} else if name.value == "decayTime" {
-				result.DecayTime = int32(parseNumberValue(state, value, 0, 2147483647))
+				result.DecayTime = int32(parseNumberValue(state, value, -1, 2147483647))
 			} else if name.value == "decayVolume" {
 				result.DecayVolume = uint8(parseNumberValue(state, value, 0, 127))
 			} else if name.value == "releaseTime" {

@@ -468,11 +468,10 @@ func sfzParseAsBankFile(input *sfz.SfzFile, sfzFilename string) (*al64.ALBankFil
 
 				programNumber = int(parsedInt) - firstProgramIndex
 
-				if parsedInt < 0 || parsedInt > 127 {
+				if parsedInt < 0 {
 					return nil, errors.New(fmt.Sprintf(
-						"program_number should be a number between %d and %d not '%s'",
+						"program_number should be a number greater than %d not '%s'",
 						firstProgramIndex,
-						firstProgramIndex+127,
 						programNumberAsString,
 					))
 				}

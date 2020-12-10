@@ -132,9 +132,9 @@ func writeSfzInstrument(state *insConversionState, source interface{}, output *o
 		writeSfzEnvelope(sound.Envelope, instFile)
 
 		if sound.Wavetable.AdpcWave.Loop != nil {
-			writeSfzLoop(sound.Wavetable.AdpcWave.Loop.Start, sound.Wavetable.AdpcWave.Loop.End, instFile)
+			writeSfzLoop(sound.Wavetable.AdpcWave.Loop.Start, sound.Wavetable.AdpcWave.Loop.End-1, instFile)
 		} else if sound.Wavetable.RawWave.Loop != nil {
-			writeSfzLoop(sound.Wavetable.RawWave.Loop.Start, sound.Wavetable.RawWave.Loop.End, instFile)
+			writeSfzLoop(sound.Wavetable.RawWave.Loop.Start, sound.Wavetable.RawWave.Loop.End-1, instFile)
 		}
 	}
 

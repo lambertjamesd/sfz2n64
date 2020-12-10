@@ -385,7 +385,12 @@ func (bank *ALBank) serializeWrite(state *alSerializeState, target io.Writer) er
 	binary.Write(target, binary.BigEndian, &percussionOffset)
 
 	for _, instrument := range bank.InstArray {
-		var instumentOffset = state.getSerializableOffset(instrument)
+		var instumentOffset int32
+		if instrument == nil {
+			instumentOffset = 0
+		} else {
+			instumentOffset = state.getSerializableOffset(instrument)
+		}
 		binary.Write(target, binary.BigEndian, &instumentOffset)
 	}
 
@@ -406,7 +411,9 @@ func (bank *ALBank) generateLayout(state *alSerializeState) {
 	}
 
 	for _, instrument := range bank.InstArray {
-		state.layoutSerializable(instrument)
+		if instrument != nil {
+			state.layoutSerializable(instrument)
+		}
 	}
 }
 
