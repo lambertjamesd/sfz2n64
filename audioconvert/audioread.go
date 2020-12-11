@@ -66,6 +66,9 @@ func wavToSoundEntry(filename string) (*al64.ALSound, error) {
 	result.Wavetable.DataFromTable = waveFile.Data
 	result.Wavetable.FileSampleRate = waveFile.Header.SampleRate
 
+	result.SamplePan = 64
+	result.SampleVolume = 127
+
 	return &result, nil
 }
 
@@ -210,6 +213,9 @@ func aiffToSoundEntry(filename string) (*al64.ALSound, error) {
 		}
 		// TODO loops
 	}
+
+	result.SamplePan = 64
+	result.SampleVolume = 127
 
 	return &result, nil
 }

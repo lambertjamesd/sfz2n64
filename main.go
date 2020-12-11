@@ -380,7 +380,13 @@ func main() {
 			}
 
 			for i := 0; i < len(bankMapping) && i < len(bankFile.BankArray); i++ {
-				bankFile.BankArray[i] = convert.RemoveUnusedSounds(bankFile.BankArray[i], bankMapping[i])
+				bank, err := convert.RemoveUnusedSounds(bankFile.BankArray[i], bankMapping[i])
+
+				if err != nil {
+					log.Fatal(err)
+				} else {
+					bankFile.BankArray[i] = bank
+				}
 			}
 		}
 

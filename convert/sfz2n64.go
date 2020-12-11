@@ -233,7 +233,7 @@ func sfzParseLoop(region *sfz.SfzFullRegion, sound *al64.ALSound) error {
 
 		sound.Wavetable.RawWave.Loop = &al64.ALRawLoop{
 			Start: start,
-			End:   end,
+			End:   end + 1,
 			Count: ^uint32(0),
 		}
 	}

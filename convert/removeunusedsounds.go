@@ -1,6 +1,8 @@
 package convert
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -38,7 +40,7 @@ func getUsedInstrument(bank *al64.ALBank, instrumentNumber int, key uint8, veloc
 	return nil, nil
 }
 
-func markUsedSounds(bank *al64.ALBank, seqArray []*midi.Midi, into map[interface{}]bool) {
+func markUsedSounds(bank *al64.ALBank, seqArray []*midi.Midi, into map[interface{}]bool) error {
 	var programs [16]int
 
 	programs[9] = percussionChannel
@@ -51,17 +53,18 @@ func markUsedSounds(bank *al64.ALBank, seqArray []*midi.Midi, into map[interface
 				} else if event.EventType == midi.MidiOn {
 					inst, sound := getUsedInstrument(bank, programs[event.Channel], event.FirstParam, event.SecondParam)
 
-					if inst != nil {
-						into[inst] = true
+					if inst == nil || sound == nil {
+						return errors.New(fmt.Sprintf("Could not find instrument mapped to key=%d vel=%d instrument=%d", event.FirstParam, event.SecondParam, programs[event.Channel]))
 					}
 
-					if sound != nil {
-						into[sound] = true
-					}
+					into[inst] = true
+					into[sound] = true
 				}
 			}
 		}
 	}
+
+	return nil
 }
 
 func removeUnusedSoundsFromInstrument(instrument *al64.ALInstrument, used map[interface{}]bool) *al64.ALInstrument {
@@ -80,9 +83,13 @@ func removeUnusedSoundsFromInstrument(instrument *al64.ALInstrument, used map[in
 	return &result
 }
 
-func RemoveUnusedSounds(bank *al64.ALBank, seqArray []*midi.Midi) *al64.ALBank {
+func RemoveUnusedSounds(bank *al64.ALBank, seqArray []*midi.Midi) (*al64.ALBank, error) {
 	var used = make(map[interface{}]bool)
-	markUsedSounds(bank, seqArray, used)
+	err := markUsedSounds(bank, seqArray, used)
+
+	if err != nil {
+		return nil, err
+	}
 
 	var result al64.ALBank
 
@@ -106,7 +113,7 @@ func RemoveUnusedSounds(bank *al64.ALBank, seqArray []*midi.Midi) *al64.ALBank {
 		}
 	}
 
-	return &result
+	return &result, nil
 }
 
 func ParseBankUsageFile(bankUsage string) ([][]*midi.Midi, error) {
