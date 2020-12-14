@@ -496,41 +496,38 @@ func (soundArray *SoundArray) Serialize(target io.Writer) error {
 	return state.writeOut(target)
 }
 
-func (sound *ALSound) LayoutTbl(offset int32, tblData []byte) (int32, []byte) {
-	var padding = ((offset + 0xf) & ^0xf) - offset
+func (sound *ALSound) LayoutTbl(tblData []byte) []byte {
+	var padding = ((len(tblData) + 0xf) & ^0xf) - len(tblData)
 
 	if padding != 0 {
-		offset = offset + padding
 		tblData = append(tblData, make([]byte, padding)...)
 	}
 
-	sound.Wavetable.Base = sound.Wavetable.Base + offset
-	offset = offset + int32(len(sound.Wavetable.DataFromTable))
+	sound.Wavetable.Base = int32(len(tblData))
 	tblData = append(tblData, sound.Wavetable.DataFromTable...)
 
-	return offset, tblData
+	return tblData
 }
 
-func (instrument *ALInstrument) LayoutTbl(offset int32, tblData []byte) (int32, []byte) {
+func (instrument *ALInstrument) LayoutTbl(tblData []byte) []byte {
 	if instrument == nil {
-		return offset, tblData
+		return tblData
 	}
 
 	for _, sound := range instrument.SoundArray {
-		offset, tblData = sound.LayoutTbl(offset, tblData)
+		tblData = sound.LayoutTbl(tblData)
 	}
 
-	return offset, tblData
+	return tblData
 }
 
-func (bankFile *ALBankFile) LayoutTbl(offset int32, tblData []byte) (int32, []byte) {
-
+func (bankFile *ALBankFile) LayoutTbl(tblData []byte) []byte {
 	for _, bank := range bankFile.BankArray {
-		offset, tblData = bank.Percussion.LayoutTbl(offset, tblData)
+		tblData = bank.Percussion.LayoutTbl(tblData)
 		for _, ins := range bank.InstArray {
-			offset, tblData = ins.LayoutTbl(offset, tblData)
+			tblData = ins.LayoutTbl(tblData)
 		}
 	}
 
-	return offset, tblData
+	return tblData
 }

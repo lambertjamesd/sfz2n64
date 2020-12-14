@@ -29,12 +29,11 @@ func WriteSoundBank(outputName string, inputSounds []string, compressionSettings
 		sounds = append(sounds, sound)
 	}
 
-	var offset int32 = 0
 	var combinedData []byte = nil
 	var soundData al64.SoundArray = al64.SoundArray{Sounds: nil}
 
 	for _, sound := range sounds {
-		offset, combinedData = sound.LayoutTbl(offset, combinedData)
+		combinedData = sound.LayoutTbl(combinedData)
 
 		soundData.Sounds = append(soundData.Sounds, sound)
 	}
@@ -71,7 +70,7 @@ func WriteSoundBank(outputName string, inputSounds []string, compressionSettings
 }
 
 func WriteCtlFile(outputName string, bankFile *al64.ALBankFile) error {
-	_, tblData := bankFile.LayoutTbl(0, nil)
+	tblData := bankFile.LayoutTbl(nil)
 
 	outFile, err := os.OpenFile(outputName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 

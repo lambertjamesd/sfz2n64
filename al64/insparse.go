@@ -705,7 +705,7 @@ func ParseIns(input string, inputName string, loader WaveTableLoader) (*ParsedIn
 
 	var validationErrors = validateIns(state.result.BankFile, &state)
 
-	_, tblData := state.result.BankFile.LayoutTbl(0, nil)
+	tblData := state.result.BankFile.LayoutTbl(nil)
 	state.result.TblData = tblData
 
 	return state.result, append(state.errors, validationErrors...)
