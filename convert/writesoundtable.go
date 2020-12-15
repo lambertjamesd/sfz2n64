@@ -86,7 +86,7 @@ func WriteCtlFile(outputName string, bankFile *al64.ALBankFile) error {
 		return err
 	}
 
-	tblFile, err := os.OpenFile(outputName+".tbl", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	tblFile, err := os.OpenFile(outputName[0:len(outputName)-4]+".tbl", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 
 	if err != nil {
 		return err

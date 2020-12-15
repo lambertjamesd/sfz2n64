@@ -68,8 +68,9 @@ func main() {
 	args.AddFloatArg([]string{"--threshold"}, "the threshold used in adpcm compression", 10, 1, 32)
 	args.AddIntegerArg([]string{"--bits"}, "the number of bits to use for adpcm compression", 2, 1, 4)
 	args.AddIntegerArg([]string{"--refine-iterations"}, "the number of refinement iterations to use in adpcm compression", 2, 1, 20000)
+	args.AddFlagArg([]string{"--compress"}, "compress any uncompressed audio when converting")
 
-	namedArgs, orderedArgs, errors := args.Parse(os.Args)
+	namedArgs, orderedArgs, errors := args.Parse(os.Args[1:len(os.Args)])
 
 	intermediate, _ := namedArgs["--help"]
 	showHelp, _ := intermediate.(bool)
@@ -86,7 +87,7 @@ func main() {
 		return
 	}
 
-	var input = orderedArgs[1]
+	var input = orderedArgs[0]
 
 	var ext = filepath.Ext(input)
 	var outExt = filepath.Ext(output)
@@ -103,15 +104,7 @@ func main() {
 		}
 
 		convertBank(input, output, args)
-	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" || ext == ".aif" {
-		compressionSettings, err := ParseCompressionSettings(namedArgs)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		convertAudio(input, output, compressionSettings)
-	} else if ext == ".sounds" {
+	} else if outExt == ".sounds" {
 		intermediate, _ = namedArgs["--compress"]
 		shouldCompress, _ := intermediate.(bool)
 
@@ -126,13 +119,21 @@ func main() {
 			}
 		}
 
-		err := convert.WriteSoundBank(input, orderedArgs[2:len(orderedArgs)], compressionSettings)
+		err := convert.WriteSoundBank(output, orderedArgs, compressionSettings)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		log.Println("Wrote sound array to " + input)
+		log.Println("Wrote sound array to " + output)
+	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" || ext == ".aif" {
+		compressionSettings, err := ParseCompressionSettings(namedArgs)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		convertAudio(input, output, compressionSettings)
 	} else if ext == ".mid" && isBankFile(outExt) {
 		extractMidi(input, output)
 	} else {

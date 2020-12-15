@@ -88,6 +88,7 @@ func (args *Args) Parse(stringArgs []string) (map[string]interface{}, []string, 
 			var maxActualArgs = len(stringArgs) - index
 			if maxActualArgs >= argParam.ArgCount() {
 				value, err := argParam.ValidateAndParse(current, stringArgs[index:index+argParam.ArgCount()])
+				index += argParam.ArgCount()
 
 				if err != nil {
 					errs = append(errs, err)
