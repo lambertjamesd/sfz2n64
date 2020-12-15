@@ -511,6 +511,7 @@ func (sound *ALSound) LayoutTbl(tblData []byte) []byte {
 	}
 
 	sound.Wavetable.Base = int32(len(tblData))
+	sound.Wavetable.Len = int32((len(sound.Wavetable.DataFromTable) + 1) & (^1))
 	tblData = append(tblData, sound.Wavetable.DataFromTable...)
 
 	return tblData

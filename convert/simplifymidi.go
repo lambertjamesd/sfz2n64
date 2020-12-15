@@ -20,6 +20,7 @@ type activeNote struct {
 	untilMicroseconds int
 	currentSound      *al64.ALSound
 	key               noteKey
+	channel           uint8
 }
 
 type midiTime struct {
@@ -60,13 +61,21 @@ func removeStoppedSounds(noteMapping map[noteKey]*activeNote, microSeconds int) 
 	}
 }
 
-func SimplifyMidi(midiFile *midi.Midi, bank *al64.ALBank, maxActiveSounds int) int {
+func SimplifyMidi(midiFile *midi.Midi, bank *al64.ALBank, maxActiveSounds int) (*midi.Midi, int) {
 	var noteEndMapping = make(map[noteKey]*activeNote)
 	var programs [16]int
 
 	var maxActive = 0
 
 	programs[9] = percussionChannel
+
+	var result midi.Midi = midi.Midi{
+		Type:            midi.SingleTrack,
+		TicksPerQuarter: midiFile.TicksPerQuarter,
+		Tracks:          nil,
+	}
+
+	var resultTrack midi.Track
 
 	var time = newMidiTime(int(midiFile.TicksPerQuarter))
 
@@ -82,7 +91,7 @@ func SimplifyMidi(midiFile *midi.Midi, bank *al64.ALBank, maxActiveSounds int) i
 				if sound != nil {
 					var noteEndTime = noNoteEnd
 
-					if sound.Envelope.DecayVolume == 0 {
+					if sound.Envelope.DecayVolume == 0 && sound.Envelope.DecayTime >= 0 {
 						noteEndTime = time.currentMicroSecs + int(sound.Envelope.AttackTime+sound.Envelope.DecayTime)
 					}
 
@@ -91,6 +100,7 @@ func SimplifyMidi(midiFile *midi.Midi, bank *al64.ALBank, maxActiveSounds int) i
 						noteEndTime,
 						sound,
 						note,
+						event.Channel,
 					}
 
 					if len(noteEndMapping) > maxActive {
@@ -109,9 +119,35 @@ func SimplifyMidi(midiFile *midi.Midi, bank *al64.ALBank, maxActiveSounds int) i
 				}
 			} else if event.EventType == midi.Metadata && event.FirstParam == midi.MetaTempo {
 				log.Fatal("Tempo midi event not currently supported\n")
+			} else if event.EventType == midi.Metadata && event.FirstParam == midi.MetaEnd {
+				time.updateTo(int(event.AbsoluteTime))
+				removeStoppedSounds(noteEndMapping, time.currentMicroSecs)
+
+				var activeCount = 0
+
+				for _, runningNote := range noteEndMapping {
+					if runningNote.untilMicroseconds == noNoteEnd {
+						resultTrack.Events = append(resultTrack.Events, &midi.MidiEvent{
+							AbsoluteTime: event.AbsoluteTime,
+							EventType:    midi.MidiOff,
+							Channel:      runningNote.channel,
+							FirstParam:   uint8(runningNote.key.node),
+							SecondParam:  0,
+							Metadata:     nil,
+						})
+
+						activeCount = activeCount + 1
+					}
+				}
+
+				log.Printf("Notes still active at the end %d\n", activeCount)
 			}
+
+			resultTrack.Events = append(resultTrack.Events, event)
 		}
 	}
 
-	return maxActive
+	result.Tracks = []*midi.Track{&resultTrack}
+
+	return &result, maxActive
 }
