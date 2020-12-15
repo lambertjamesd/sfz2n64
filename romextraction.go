@@ -115,7 +115,7 @@ func extractMidi(input string, output string) {
 
 	defer midFile.Close()
 
-	midi, err := midi.ReadMidi(midFile)
+	inputMidi, err := midi.ReadMidi(midFile)
 
 	if err != nil {
 		log.Fatal(err)
@@ -127,7 +127,21 @@ func extractMidi(input string, output string) {
 		log.Fatal(err)
 	}
 
-	var maxActiveNotes = convert.SimplifyMidi(midi, bankFile.BankArray[0], 20)
+	modifiedMidi, maxActiveNotes := convert.SimplifyMidi(inputMidi, bankFile.BankArray[0], 20)
 
 	log.Println(fmt.Sprintf("Max number of active notes %d\n", maxActiveNotes))
+
+	outFile, err := os.OpenFile(input[0:len(input)-4]+"Modified.mid", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer outFile.Close()
+
+	err = midi.WriteMidi(outFile, modifiedMidi)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }

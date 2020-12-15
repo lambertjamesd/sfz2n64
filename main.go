@@ -134,47 +134,7 @@ func main() {
 
 		log.Println("Wrote sound array to " + input)
 	} else if ext == ".mid" && isBankFile(outExt) {
-<<<<<<< HEAD
-		midFile, err := os.Open(input)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		defer midFile.Close()
-
-		inputMidi, err := midi.ReadMidi(midFile)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		bankFile, _, _, err := parseInputBank(output)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		modifiedMidi, maxActiveNotes := convert.SimplifyMidi(inputMidi, bankFile.BankArray[0], 20)
-
-		log.Println(fmt.Sprintf("Max number of active notes %d\n", maxActiveNotes))
-
-		outFile, err := os.OpenFile(input[0:len(input)-4]+"Modified.mid", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		defer outFile.Close()
-
-		err = midi.WriteMidi(outFile, modifiedMidi)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-=======
 		extractMidi(input, output)
->>>>>>> c188d23ef25680c1ea55321a8f165d8f1ab77f74
 	} else {
 		log.Fatal(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file\n", input))
 	}
