@@ -2,7 +2,6 @@ package romextractor
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/lambertjamesd/sfz2n64/midi"
 )
@@ -21,7 +20,7 @@ func FindMidi(content []byte) []*midi.Midi {
 			midiCheck, err := midi.ReadMidi(&reader)
 
 			if err == nil {
-				log.Println(fmt.Sprintf("Found midi at offset %x", i))
+				fmt.Println(fmt.Sprintf("Found midi at offset %x", i))
 				result = append(result, midiCheck)
 			}
 		}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 
 	"github.com/lambertjamesd/sfz2n64/al64"
@@ -68,7 +67,7 @@ func FindBanks(content []byte) []*al64.ALBankFile {
 			bankCheck, err := al64.ReadBankFile(&reader)
 
 			if err == nil {
-				log.Println(fmt.Sprintf("Found bank at offset %x", i))
+				fmt.Println(fmt.Sprintf("Found bank at offset %x", i))
 				result = append(result, bankCheck)
 			}
 		}

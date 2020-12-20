@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -19,7 +18,8 @@ func extractMidiFromRom(input string, output string) {
 	data, err := ioutil.ReadFile(input)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	romextractor.CorrectByteswap(data)
@@ -33,13 +33,14 @@ func extractMidiFromRom(input string, output string) {
 		outFile, err := os.OpenFile(newFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
 		midi.WriteMidi(outFile, song)
 	}
 
-	log.Println(fmt.Sprintf("Found %d songs", len(songs)))
+	fmt.Println(fmt.Sprintf("Found %d songs", len(songs)))
 
 }
 
@@ -49,7 +50,8 @@ func extractFromRom(input string, output string) {
 	data, err := ioutil.ReadFile(input)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	romextractor.CorrectByteswap(data)
@@ -57,7 +59,8 @@ func extractFromRom(input string, output string) {
 	banks := romextractor.FindBanks(data)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	var finalBanks []*al64.ALBankWithTable = nil
@@ -73,7 +76,7 @@ func extractFromRom(input string, output string) {
 				Tbl:  tblData,
 			})
 		} else {
-			log.Println("Failed to find tbl data for bank")
+			fmt.Println("Failed to find tbl data for bank")
 		}
 	}
 
@@ -86,10 +89,12 @@ func extractFromRom(input string, output string) {
 		if os.IsNotExist(err) {
 			err = os.Mkdir(newDir, 0777)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
+				os.Exit(1)
 			}
 		} else if !dirState.IsDir() {
-			log.Fatal(fmt.Sprintf("%s is not a directory", newDir))
+			fmt.Println(fmt.Sprintf("%s is not a directory", newDir))
+			os.Exit(1)
 		}
 
 		var finalPath = filepath.Join(newDir, filepath.Base(withoutExt)+outExt)
@@ -97,20 +102,22 @@ func extractFromRom(input string, output string) {
 		err = writeBank(input, finalPath, bank.Bank, bank.Tbl, false)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		} else {
 			fmt.Printf("Wrote instrument file to %s\n", output)
 		}
 	}
 
-	log.Println(fmt.Sprintf("Found %d banks", len(finalBanks)))
+	fmt.Println(fmt.Sprintf("Found %d banks", len(finalBanks)))
 }
 
 func extractMidi(input string, output string) {
 	midFile, err := os.Open(input)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	defer midFile.Close()
@@ -118,23 +125,26 @@ func extractMidi(input string, output string) {
 	inputMidi, err := midi.ReadMidi(midFile)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	bankFile, _, _, err := parseInputBank(output)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	modifiedMidi, maxActiveNotes := convert.SimplifyMidi(inputMidi, bankFile.BankArray[0], 20)
 
-	log.Println(fmt.Sprintf("Max number of active notes %d\n", maxActiveNotes))
+	fmt.Println(fmt.Sprintf("Max number of active notes %d\n", maxActiveNotes))
 
 	outFile, err := os.OpenFile(input[0:len(input)-4]+"Modified.mid", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	defer outFile.Close()
@@ -142,6 +152,7 @@ func extractMidi(input string, output string) {
 	err = midi.WriteMidi(outFile, modifiedMidi)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

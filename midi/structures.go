@@ -2,7 +2,7 @@ package midi
 
 import (
 	"fmt"
-	"log"
+	"os"
 )
 
 const MidiHeader = 0x4D546864
@@ -84,7 +84,8 @@ func bytesForEvent(eventType MidiEventType) int {
 		return 2
 	}
 
-	log.Fatal(fmt.Sprintf("Unknown event type %d", eventType))
+	fmt.Println(fmt.Sprintf("Unknown event type %d", eventType))
+	os.Exit(1)
 
 	return 0
 }

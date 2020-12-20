@@ -645,12 +645,13 @@ func parseFile(state *parseState) {
 			} else if next.value == "bank" {
 				state.inError = false
 				parseBank(state)
-			} else {
+			} else if !state.inError {
 				state.errors = append(state.errors, ParseError{
 					next,
 					fmt.Sprintf("Expected %s but got %s", validStructureNames, next.value),
 					state.source,
 				})
+				state.inError = true
 			}
 		}
 	}

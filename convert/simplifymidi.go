@@ -1,7 +1,8 @@
 package convert
 
 import (
-	"log"
+	"fmt"
+	"os"
 
 	"github.com/lambertjamesd/sfz2n64/al64"
 	"github.com/lambertjamesd/sfz2n64/midi"
@@ -118,7 +119,8 @@ func SimplifyMidi(midiFile *midi.Midi, bank *al64.ALBank, maxActiveSounds int) (
 					active.untilMicroseconds = time.currentMicroSecs + int(active.currentSound.Envelope.ReleaseTime)
 				}
 			} else if event.EventType == midi.Metadata && event.FirstParam == midi.MetaTempo {
-				log.Fatal("Tempo midi event not currently supported\n")
+				fmt.Println("Tempo midi event not currently supported")
+				os.Exit(1)
 			} else if event.EventType == midi.Metadata && event.FirstParam == midi.MetaEnd {
 				time.updateTo(int(event.AbsoluteTime))
 				removeStoppedSounds(noteEndMapping, time.currentMicroSecs)
@@ -140,7 +142,7 @@ func SimplifyMidi(midiFile *midi.Midi, bank *al64.ALBank, maxActiveSounds int) (
 					}
 				}
 
-				log.Printf("Notes still active at the end %d\n", activeCount)
+				fmt.Printf("Notes still active at the end %d\n", activeCount)
 			}
 
 			resultTrack.Events = append(resultTrack.Events, event)

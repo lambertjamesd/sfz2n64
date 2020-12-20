@@ -1,6 +1,9 @@
 package adpcm
 
-import "log"
+import (
+	"fmt"
+	"os"
+)
 
 func innerProduct(length int, v1 []int32, v2 [16]int32) int32 {
 	var out int32 = 0
@@ -442,7 +445,8 @@ func EncodeADPCM(data *PCMEncodedData, codebook *Codebook, loop *Loop, truncate 
 
 		for currentPos <= loop.Start {
 			if currentPos+16 > len(data.Samples) {
-				log.Fatal("Not enough samples in file\n")
+				fmt.Println("Not enough samples in file")
+				os.Exit(1)
 			}
 
 			var frame = encodeFrame(data.Samples[currentPos:currentPos+16], state, codebook)

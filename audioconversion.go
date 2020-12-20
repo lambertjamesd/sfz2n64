@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -16,7 +15,8 @@ func convertAudio(input string, output string, compressionSettings *adpcm.Compre
 	sound, err := audioconvert.ReadWavetable(input)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	var outExt = filepath.Ext(output)
@@ -30,7 +30,8 @@ func convertAudio(input string, output string, compressionSettings *adpcm.Compre
 			)
 
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
+				os.Exit(1)
 			}
 		} else {
 			codebook = audioconvert.ConvertCodebook(sound.Wavetable.AdpcWave.Book)
@@ -39,7 +40,9 @@ func convertAudio(input string, output string, compressionSettings *adpcm.Compre
 		outputFile, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0664)
 
 		if err != nil {
-			log.Fatal(err)
+
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
 		codebook.Serialize(outputFile)
@@ -49,19 +52,22 @@ func convertAudio(input string, output string, compressionSettings *adpcm.Compre
 		err = audioconvert.CompressWithSettings(sound.Wavetable, input, compressionSettings)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
 		err = audioconvert.WriteAifc(output, sound.Wavetable, sound.Wavetable.DataFromTable, sound.Wavetable.FileSampleRate)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 	} else if outExt == ".aif" || outExt == ".aiff" {
 		err = audioconvert.WriteAiff(output, sound.Wavetable, sound.Wavetable.DataFromTable, sound.Wavetable.FileSampleRate)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 	} else if outExt == ".wav" {
 		err = audioconvert.WriteWav(output, sound.Wavetable, sound.Wavetable.DataFromTable, sound.Wavetable.FileSampleRate)

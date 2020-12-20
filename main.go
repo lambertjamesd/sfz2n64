@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -100,7 +99,8 @@ func main() {
 		args, err := ParseBankConvertArgs(namedArgs)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
 		convertBank(input, output, args)
@@ -115,28 +115,32 @@ func main() {
 			compressionSettings, err = ParseCompressionSettings(namedArgs)
 
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
+				os.Exit(1)
 			}
 		}
 
 		err := convert.WriteSoundBank(output, orderedArgs, compressionSettings)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
-		log.Println("Wrote sound array to " + output)
+		fmt.Println("Wrote sound array to " + output)
 	} else if ext == ".aifc" || ext == ".aiff" || ext == ".wav" || ext == ".aif" {
 		compressionSettings, err := ParseCompressionSettings(namedArgs)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
 		convertAudio(input, output, compressionSettings)
 	} else if ext == ".mid" && isBankFile(outExt) {
 		extractMidi(input, output)
 	} else {
-		log.Fatal(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file\n", input))
+		fmt.Println(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file\n", input))
+		os.Exit(1)
 	}
 }

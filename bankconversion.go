@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -84,7 +83,7 @@ func parseInputBank(input string) (*al64.ALBankFile, []byte, bool, error) {
 
 		if len(parseErrors) != 0 {
 			for _, err := range parseErrors {
-				log.Println(err.Error())
+				fmt.Println(err.Error())
 			}
 			return nil, nil, false, errors.New("Could not parse ins file\n")
 		}
@@ -125,21 +124,24 @@ func convertBank(input string, output string, args *SFZConvertArgs) {
 	bankFile, tblData, isSingleInstrument, err := parseInputBank(input)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	if args.BankSequenceMapping != "" {
 		bankMapping, err := convert.ParseBankUsageFile(args.BankSequenceMapping)
 
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
 		for i := 0; i < len(bankMapping) && i < len(bankFile.BankArray); i++ {
 			bank, err := convert.RemoveUnusedSounds(bankFile.BankArray[i], bankMapping[i])
 
 			if err != nil {
-				log.Fatal(err)
+				fmt.Println(err)
+				os.Exit(1)
 			} else {
 				bankFile.BankArray[i] = bank
 			}
@@ -154,7 +156,8 @@ func convertBank(input string, output string, args *SFZConvertArgs) {
 	err = writeBank(input, output, bankFile, tblData, isSingleInstrument)
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		os.Exit(1)
 	} else {
 		fmt.Printf("Wrote instrument file to %s\n", output)
 	}
