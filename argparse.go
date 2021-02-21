@@ -38,7 +38,7 @@ func (args *Args) AddStringArg(names []string, helpMessage string, defaultValue 
 }
 
 func (args *Args) AddIntegerArg(names []string, helpMessage string, defaultValue int64, minValue int64, maxValue int64) {
-	var arg = &integerArg{names, helpMessage, defaultValue, minValue, maxValue}
+	var arg = &integerArg{names, helpMessage, minValue, maxValue, defaultValue}
 	args.args = append(args.args, arg)
 	for _, name := range names {
 		args.flagNameToArg[name] = arg
@@ -46,7 +46,7 @@ func (args *Args) AddIntegerArg(names []string, helpMessage string, defaultValue
 }
 
 func (args *Args) AddFloatArg(names []string, helpMessage string, defaultValue float64, minValue float64, maxValue float64) {
-	var arg = &floatArg{names, helpMessage, defaultValue, minValue, maxValue}
+	var arg = &floatArg{names, helpMessage, minValue, maxValue, defaultValue}
 	args.args = append(args.args, arg)
 	for _, name := range names {
 		args.flagNameToArg[name] = arg
