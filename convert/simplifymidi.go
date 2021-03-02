@@ -31,7 +31,7 @@ type midiTime struct {
 	lastTick         int
 }
 
-const noNoteEnd int = int(uint(0xffffffffffffffff) >> 1)
+const noNoteEnd int = -1
 
 func newMidiTime(ticksPerQuarter int) midiTime {
 	return midiTime{
