@@ -325,6 +325,26 @@ func parseKeymap(state *parseState) {
 		}
 	}
 
+	if result.KeyMin > result.KeyMax {
+		keyMinToken, _ := itemTokenMapping.namedEntryMapping["keyMin"]
+
+		state.errors = append(state.errors, ParseError{
+			keyMinToken,
+			fmt.Sprintf("keyMin should be less than or equal to keyMax"),
+			state.source,
+		})
+	}
+
+	if result.VelocityMin > result.VelocityMax {
+		keyMinToken, _ := itemTokenMapping.namedEntryMapping["keyMin"]
+
+		state.errors = append(state.errors, ParseError{
+			keyMinToken,
+			fmt.Sprintf("velocityMin should be less than or equal to velocityMax"),
+			state.source,
+		})
+	}
+
 	state.result.StructureOrder = append(state.result.StructureOrder, &result)
 
 	if instrumentName != nil {
@@ -343,6 +363,7 @@ func parseSound(state *parseState) {
 	state.tokenMapping[&result] = itemTokenMapping
 
 	var parsing = true
+	var hasSound = false
 
 	for state.hasMore() && parsing {
 		name, value, _ := parseAttribute(state)
@@ -436,10 +457,18 @@ func parseSound(state *parseState) {
 				var waveFilename = filepath.Join(filepath.Dir(state.source.name), relativePath)
 				waveTable, err := state.waveLoader(waveFilename)
 
+				hasSound = true
+
 				if err != nil {
 					state.errors = append(state.errors, ParseError{
 						value,
 						err.Error(),
+						state.source,
+					})
+				} else if waveTable == nil {
+					state.errors = append(state.errors, ParseError{
+						value,
+						"Unknown error loading wavetable",
 						state.source,
 					})
 				} else {
@@ -462,6 +491,14 @@ func parseSound(state *parseState) {
 			parsing = false
 			state.inError = false
 		}
+	}
+
+	if !hasSound {
+		state.errors = append(state.errors, ParseError{
+			instrumentName,
+			"No sound effect specified",
+			state.source,
+		})
 	}
 
 	state.result.StructureOrder = append(state.result.StructureOrder, &result)
