@@ -266,7 +266,7 @@ func insToSoundEntry(filename string) (*al64.ALSound, error) {
 	return asSound, nil
 }
 
-func ReadWavetable(filename string) (*al64.ALSound, error) {
+func readWavetable(filename string) (*al64.ALSound, error) {
 	var ext = filepath.Ext(filename)
 
 	if ext == ".wav" {
@@ -278,6 +278,26 @@ func ReadWavetable(filename string) (*al64.ALSound, error) {
 	} else {
 		return nil, errors.New("Not a supported sound file " + filename)
 	}
+}
+
+var wavetableCache = make(map[string]*al64.ALSound)
+
+func ReadWavetable(filename string) (*al64.ALSound, error) {
+	cached, has := wavetableCache[filename]
+
+	if has {
+		return cached, nil
+	}
+
+	result, err := readWavetable(filename)
+
+	if err != nil {
+		return nil, err
+	}
+
+	wavetableCache[filename] = result
+
+	return result, nil
 }
 
 func buildTblInstrument(instrument *al64.ALInstrument, result []byte) []byte {
