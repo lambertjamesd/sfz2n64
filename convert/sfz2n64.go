@@ -250,6 +250,10 @@ func sfzParseSound(region *sfz.SfzFullRegion) (*al64.ALSound, error) {
 
 	result, err := audioconvert.ReadWavetable(filename)
 
+	if err != nil {
+		return nil, err
+	}
+
 	keyMap, err := sfzParseKeyMap(region)
 
 	if err != nil {
