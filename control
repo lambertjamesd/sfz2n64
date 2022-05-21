@@ -1,0 +1,7 @@
+Package: sfz2n64
+Version: 1.0
+Architecture: amd64
+Depends: 
+Maintainer: James Lambert lambertjamesd@gmail.com
+Description: sfz2n64
+ Converts SFZ files to a format the N64 can use as part of instrument banks
