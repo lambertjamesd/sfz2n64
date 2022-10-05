@@ -2,7 +2,9 @@ package sfz
 
 import (
 	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -139,7 +141,7 @@ func createStackFrame(filename string) (*sfzParseStackFrame, error) {
 	return &sfzParseStackFrame{
 		[]rune(stripped),
 		0,
-		path.Dir(filename),
+		filepath.Dir(pathClean(filename)),
 	}, nil
 }
 
@@ -241,19 +243,23 @@ func getLastSection(target *SfzFile) *SfzSection {
 	return target.Sections[len(target.Sections)-1]
 }
 
+func pathClean(filename string) string {
+	return path.Clean(strings.Replace(strings.Replace(filename, "\\", string(os.PathSeparator), -1), "/", string(os.PathSeparator), -1))
+}
+
 func checkFinishPair(target *SfzFile, context *sfzParseContext, frame *sfzParseStackFrame) {
 	if context.currentLabel != "" {
 		var section = getLastSection(target)
 
 		if context.currentLabel == "sample" {
-			var cleanedPath = path.Clean(strings.Replace(context.currentValue, "\\", "/", -1))
+			var cleanedPath = pathClean(context.currentValue)
 			if context.defaultPath == "" {
 				context.currentValue = path.Join(frame.cwd, cleanedPath)
 			} else {
 				context.currentValue = path.Join(context.defaultPath, cleanedPath)
 			}
 		} else if context.currentLabel == "default_path" {
-			context.defaultPath = path.Join(frame.cwd, path.Clean(strings.Replace(context.currentValue, "\\", "/", -1)))
+			context.defaultPath = pathClean(context.currentValue)
 		}
 
 		section.ValuePairs = append(section.ValuePairs, SfzValuePair{
