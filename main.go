@@ -6,16 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/lambertjamesd/sfz2n64/adpcm"
+	"github.com/lambertjamesd/sfz2n64/commands"
 	"github.com/lambertjamesd/sfz2n64/convert"
 )
 
-type SFZConvertArgs struct {
-	TargetSampleRate    int
-	BankSequenceMapping string
-}
-
-func ParseBankConvertArgs(args map[string]interface{}) (*SFZConvertArgs, error) {
-	var result SFZConvertArgs
+func ParseBankConvertArgs(args map[string]interface{}) (*commands.SFZConvertArgs, error) {
+	var result commands.SFZConvertArgs
 
 	intermediate, _ := args["--sample-rate"]
 	sampleRate, _ := intermediate.(int64)
@@ -55,7 +51,7 @@ func ParseCompressionSettings(args map[string]interface{}) (*adpcm.CompressionSe
 }
 
 func main() {
-	var args Args = NewArgs("sfz2n64 [options] -o output.sfz|output.ins|output.ctl input.sfz|input.ins|input.ctl")
+	var args commands.Args = commands.NewArgs("sfz2n64 [options] -o output.sfz|output.ins|output.ctl input.sfz|input.ins|input.ctl")
 
 	args.AddFlagArg([]string{"-h", "--help"}, "print this help message")
 	args.AddStringArg([]string{"-o", "--output"}, "the output file", "")
@@ -91,11 +87,11 @@ func main() {
 	var ext = filepath.Ext(input)
 	var outExt = filepath.Ext(output)
 
-	if isRomFile(ext) && isBankFile(outExt) {
-		extractFromRom(input, output)
-	} else if isRomFile(ext) && outExt == ".mid" || outExt == ".midi" {
-		extractMidiFromRom(input, output)
-	} else if isBankFile(ext) && isBankFile(outExt) {
+	if commands.IsRomFile(ext) && commands.IsBankFile(outExt) {
+		commands.ExtractFromRom(input, output)
+	} else if commands.IsRomFile(ext) && outExt == ".mid" || outExt == ".midi" {
+		commands.ExtractMidiFromRom(input, output)
+	} else if commands.IsBankFile(ext) && commands.IsBankFile(outExt) {
 		args, err := ParseBankConvertArgs(namedArgs)
 
 		if err != nil {
@@ -103,7 +99,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		convertBank(input, output, args)
+		commands.ConvertBank(input, output, args)
 	} else if outExt == ".sounds" {
 		intermediate, _ = namedArgs["--compress"]
 		shouldCompress, _ := intermediate.(bool)
@@ -136,9 +132,9 @@ func main() {
 			os.Exit(1)
 		}
 
-		convertAudio(input, output, compressionSettings)
-	} else if ext == ".mid" && isBankFile(outExt) {
-		extractMidi(input, output)
+		commands.ConvertAudio(input, output, compressionSettings)
+	} else if ext == ".mid" && commands.IsBankFile(outExt) {
+		commands.ExtractMidi(input, output)
 	} else {
 		fmt.Println(fmt.Sprintf("Invalid input file '%s'. Expected .sfz or .ctl file\n", input))
 		os.Exit(1)

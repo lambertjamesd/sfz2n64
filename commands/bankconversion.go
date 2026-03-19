@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"errors"
@@ -13,15 +13,20 @@ import (
 	"github.com/lambertjamesd/sfz2n64/sfz"
 )
 
-func isBankFile(ext string) bool {
+type SFZConvertArgs struct {
+	TargetSampleRate    int
+	BankSequenceMapping string
+}
+
+func IsBankFile(ext string) bool {
 	return ext == ".sfz" || ext == ".ctl" || ext == ".ins"
 }
 
-func isRomFile(ext string) bool {
+func IsRomFile(ext string) bool {
 	return ext == ".n64" || ext == ".z64" || ext == ".v64"
 }
 
-func parseInputBank(input string) (*al64.ALBankFile, []byte, bool, error) {
+func ParseInputBank(input string) (*al64.ALBankFile, []byte, bool, error) {
 	var ext = filepath.Ext(input)
 
 	var bankFile *al64.ALBankFile
@@ -97,7 +102,7 @@ func parseInputBank(input string) (*al64.ALBankFile, []byte, bool, error) {
 	return bankFile, tblData, isSingleInstrument, nil
 }
 
-func writeBank(input string, output string, bankFile *al64.ALBankFile, tblData []byte, isSingleInstrument bool) error {
+func WriteBank(input string, output string, bankFile *al64.ALBankFile, tblData []byte, isSingleInstrument bool) error {
 	var outExt = filepath.Ext(output)
 
 	if outExt == ".sfz" {
@@ -120,8 +125,8 @@ func writeBank(input string, output string, bankFile *al64.ALBankFile, tblData [
 	}
 }
 
-func convertBank(input string, output string, args *SFZConvertArgs) {
-	bankFile, tblData, isSingleInstrument, err := parseInputBank(input)
+func ConvertBank(input string, output string, args *SFZConvertArgs) {
+	bankFile, tblData, isSingleInstrument, err := ParseInputBank(input)
 
 	if err != nil {
 		fmt.Println(err)
@@ -153,7 +158,7 @@ func convertBank(input string, output string, args *SFZConvertArgs) {
 		tblData = bankFile.LayoutTbl(nil)
 	}
 
-	err = writeBank(input, output, bankFile, tblData, isSingleInstrument)
+	err = WriteBank(input, output, bankFile, tblData, isSingleInstrument)
 
 	if err != nil {
 		fmt.Println(err)

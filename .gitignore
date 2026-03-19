@@ -3,6 +3,8 @@
 build/*
 build.zip
 
+main
+main.exe
 sfz2n64
 sfz2n64.exe
 

@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"github.com/lambertjamesd/sfz2n64/romextractor"
 )
 
-func extractMidiFromRom(input string, output string) {
+func ExtractMidiFromRom(input string, output string) {
 	var outExt = filepath.Ext(output)
 
 	data, err := ioutil.ReadFile(input)
@@ -44,7 +44,7 @@ func extractMidiFromRom(input string, output string) {
 
 }
 
-func extractFromRom(input string, output string) {
+func ExtractFromRom(input string, output string) {
 	var outExt = filepath.Ext(output)
 
 	data, err := ioutil.ReadFile(input)
@@ -99,7 +99,7 @@ func extractFromRom(input string, output string) {
 
 		var finalPath = filepath.Join(newDir, filepath.Base(withoutExt)+outExt)
 
-		err = writeBank(input, finalPath, bank.Bank, bank.Tbl, false)
+		err = WriteBank(input, finalPath, bank.Bank, bank.Tbl, false)
 
 		if err != nil {
 			fmt.Println(err)
@@ -112,7 +112,7 @@ func extractFromRom(input string, output string) {
 	fmt.Println(fmt.Sprintf("Found %d banks", len(finalBanks)))
 }
 
-func extractMidi(input string, output string) {
+func ExtractMidi(input string, output string) {
 	midFile, err := os.Open(input)
 
 	if err != nil {
@@ -129,7 +129,7 @@ func extractMidi(input string, output string) {
 		os.Exit(1)
 	}
 
-	bankFile, _, _, err := parseInputBank(output)
+	bankFile, _, _, err := ParseInputBank(output)
 
 	if err != nil {
 		fmt.Println(err)

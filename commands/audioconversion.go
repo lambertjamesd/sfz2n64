@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"encoding/binary"
@@ -11,7 +11,7 @@ import (
 	"github.com/lambertjamesd/sfz2n64/audioconvert"
 )
 
-func convertAudio(input string, output string, compressionSettings *adpcm.CompressionSettings) {
+func ConvertAudio(input string, output string, compressionSettings *adpcm.CompressionSettings) {
 	sound, err := audioconvert.ReadWavetable(input)
 
 	if err != nil {
